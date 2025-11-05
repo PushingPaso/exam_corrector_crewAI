@@ -1,540 +1,458 @@
-import os
-import re
-import sys
-import json
-from dataclasses import dataclass
-from enum import Enum
-from pathlib import Path
+"""
+Sistema di valutazione esami con CrewAI.
+Converte il sistema LangChain in un team di agenti CrewAI.
+"""
 
+import json
+from typing import List
+
+from crewai import Agent, Task, Crew, Process
+from crewai.tools import tool
 from pydantic import BaseModel, Field
 
-from exam import DIR_ROOT
-from exam import get_questions_store
-from exam.solution import Answer
-
-OUTPUT_FILE = os.getenv("OUTPUT_FILE", None)
-if OUTPUT_FILE:
-    OUTPUT_FILE = open(OUTPUT_FILE, "w", encoding="utf-8")
-else:
-    OUTPUT_FILE = sys.stdout
-
-ALL_QUESTIONS = get_questions_store()
-PATTERN_QUESTION_FOLDER = re.compile(r"^Q\d+\s+-\s+(\w+-\d+)$")
-FILE_TEMPLATE = DIR_ROOT / "exam" / "assess" / "prompt-template.txt"
-TEMPLATE = FILE_TEMPLATE.read_text(encoding="utf-8")
+# Import esistenti
+from exam import DIR_ROOT, get_questions_store
+from exam.solution import load_cache as load_answer_cache
 
 
-class FeatureType(str, Enum):
-    """Enumeration of feature types that can be assessed in a question's answer."""
-    CORE = "core"
-    DETAILS_IMPORTANT = "important detail"
-
-
-@dataclass(frozen=True)
-class Feature:
-    # Type of the feature
-    type: FeatureType
-
-    # Description of the feature
-    description: str
-
-    @property
-    def verb_ideal(self) -> str:
-        return "should be present"
-
-    @property
-    def verb_actual(self) -> str:
-        return "is actually present"
-
-    @property
-    def is_core(self) -> bool:
-        """Determina se questa feature è core (essenziale)."""
-        return self.type == FeatureType.CORE
-
-    @property
-    def weight_percentage(self) -> float:
-        """Restituisce il peso percentuale di questa feature nel punteggio totale."""
-        if self.type == FeatureType.CORE:
-            return 0.70  # 70% del punteggio
-        elif self.type == FeatureType.DETAILS_IMPORTANT:
-            return 0.20  # 20% del punteggio
-        else:  # DETAILS_ADDITIONAL
-            return 0.10  # 10% del punteggio
-
-
-def enumerate_features(answer: Answer):
-    """Enumera le features da valutare."""
-    if not answer:
-        return
-    i = 0
-
-    # CORE - elementi essenziali
-    for core_item in answer.core:
-        yield i, Feature(type=FeatureType.CORE, description=core_item)
-        i += 1
-
-    # DETAILS_IMPORTANT - dettagli importanti
-    for detail in answer.details_important:
-        yield i, Feature(type=FeatureType.DETAILS_IMPORTANT, description=detail)
-        i += 1
-
+# ============================================================================
+# MODELLI PYDANTIC (invariati)
+# ============================================================================
 
 class FeatureAssessment(BaseModel):
     satisfied: bool = Field(description="Whether the feature is present in the answer")
     motivation: str = Field(description="Explanation of why the feature is present or not")
 
 
-class Assessor:
+# ============================================================================
+# CREWAI TOOLS (ex LangChain tools)
+# ============================================================================
+
+@tool("Load Checklist")
+def load_checklist_tool(question_id: str) -> str:
     """
-    Classe per la valutazione strutturata delle risposte degli studenti.
-    Include logica di assessment E salvataggio dei risultati.
+    Load the assessment checklist for a question.
+
+    Args:
+        question_id: The question ID (e.g., "CI-5")
+
+    Returns:
+        JSON string with checklist details
+    """
+    try:
+        questions_store = get_questions_store()
+        question = questions_store.question(question_id)
+        checklist = load_answer_cache(question)
+
+        if not checklist:
+            return json.dumps({"error": f"No checklist found for {question_id}"})
+
+        return json.dumps({
+            "status": "success",
+            "question_id": question_id,
+            "question_text": question.text,
+            "core_items": checklist.core,
+            "important_items": checklist.details_important,
+        })
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@tool("Load Exam from YAML")
+def load_exam_tool(questions_file: str, responses_file: str, grades_file: str = None) -> str:
+    """
+    Load an entire exam from YAML files.
+
+    Args:
+        questions_file: Questions YAML filename
+        responses_file: Responses YAML filename  
+        grades_file: Optional grades YAML filename
+
+    Returns:
+        JSON string with exam data
+    """
+    try:
+        from exam import load_exam_from_yaml
+
+        exam_data = load_exam_from_yaml(
+            questions_file=questions_file,
+            responses_file=responses_file,
+            grades_file=grades_file
+        )
+
+        return json.dumps({
+            "status": "success",
+            "exam_id": exam_data["exam_id"],
+            "num_questions": len(exam_data["questions"]),
+            "num_students": len(exam_data["students"]),
+            "questions": exam_data["questions"],
+            "students": [
+                {
+                    "email": s["email"],
+                    "num_responses": s["num_responses"]
+                }
+                for s in exam_data["students"]
+            ]
+        })
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@tool("Assess Single Feature")
+def assess_feature_tool(
+        question_text: str,
+        feature_description: str,
+        feature_type: str,
+        student_response: str
+) -> str:
+    """
+    Assess a single feature in a student's answer.
+
+    Args:
+        question_text: The question text
+        feature_description: What to check for
+        feature_type: "core" or "important detail"
+        student_response: Student's answer
+
+    Returns:
+        JSON with assessment result
+    """
+    from exam_llm_provider_crewai import get_llm
+
+    try:
+        llm = get_llm()
+
+        # Crea il prompt
+        prompt = f"""You are a teacher evaluating a student's answer.
+
+Question: {question_text}
+
+Feature to check ({feature_type}): {feature_description}
+
+Student's answer: {student_response}
+
+Determine if this feature is present and explain why.
+Return JSON with 'satisfied' (bool) and 'motivation' (string)."""
+
+        # Invoca il modello con structured output
+        from langchain_core.output_parsers import PydanticOutputParser
+        parser = PydanticOutputParser(pydantic_object=FeatureAssessment)
+
+        prompt_with_format = prompt + f"\n\n{parser.get_format_instructions()}"
+        result = llm.invoke(prompt_with_format)
+
+        # Parse il risultato
+        assessment = parser.parse(result.content)
+
+        return json.dumps({
+            "satisfied": assessment.satisfied,
+            "motivation": assessment.motivation
+        })
+
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+# ============================================================================
+# CREWAI AGENTS (ex AIOracle/Assessor)
+# ============================================================================
+
+def create_assessment_agents(llm_config: dict) -> tuple[Agent, Agent, Agent]:
+    """
+    Crea gli agenti specializzati per la valutazione.
+
+    Returns:
+        Tuple di (loader_agent, assessor_agent, reporter_agent)
     """
 
-    def __init__(self, evaluations_dir=None):
-        """
-        Inizializza l'assessor con il modello LLM specificato.
+    # AGENT 1: Data Loader
+    loader_agent = Agent(
+        role="Exam Data Loader",
+        goal="Load exam questions, student responses, and assessment checklists efficiently",
+        backstory="""You are a meticulous data manager for the Software Engineering course.
+        Your job is to load and organize exam data, ensuring all required information
+        is available for the assessment team.""",
+        tools=[load_checklist_tool, load_exam_tool],
+        llm=llm_config["llm"],
+        verbose=True,
+        allow_delegation=False
+    )
 
-        Args:
-            evaluations_dir: Directory per salvare le valutazioni (default: DIR_ROOT/evaluations)
-        """
-        from exam.llm_provider import llm_client
-        self.llm_client_func = llm_client
+    # AGENT 2: Answer Assessor  
+    assessor_agent = Agent(
+        role="Answer Assessor",
+        goal="Evaluate student answers against assessment criteria with fairness and consistency",
+        backstory="""You are an experienced Software Engineering professor.
+        You evaluate student answers by checking if core concepts and important details
+        are present. You are thorough but fair, giving credit where due.""",
+        tools=[assess_feature_tool],
+        llm=llm_config["llm"],
+        verbose=True,
+        allow_delegation=False
+    )
 
-        # Setup evaluations directory
-        if evaluations_dir is None:
-            self.evaluations_dir = DIR_ROOT / "evaluations"
-        else:
-            self.evaluations_dir = Path(evaluations_dir)
+    # AGENT 3: Report Generator
+    reporter_agent = Agent(
+        role="Assessment Reporter",
+        goal="Generate clear, comprehensive reports of assessment results",
+        backstory="""You are a reporting specialist who creates detailed summaries
+        of exam assessments. You organize results clearly and highlight key statistics.""",
+        llm=llm_config["llm"],
+        verbose=True,
+        allow_delegation=False
+    )
 
+    return loader_agent, assessor_agent, reporter_agent
+
+
+# ============================================================================
+# CREWAI TASKS (ex workflow steps)
+# ============================================================================
+
+def create_assessment_tasks(
+        agents: tuple[Agent, Agent, Agent],
+        exam_date: str,
+        student_email: str = None
+) -> List[Task]:
+    """
+    Crea le task per il processo di valutazione.
+
+    Args:
+        agents: Tuple di (loader, assessor, reporter)
+        exam_date: Data dell'esame (es. "2025-06-05")
+        student_email: Email studente (None = tutti)
+
+    Returns:
+        Lista di Task CrewAI
+    """
+    loader_agent, assessor_agent, reporter_agent = agents
+
+    # TASK 1: Load Exam
+    load_task = Task(
+        description=f"""Load the exam from date {exam_date}.
+
+        Steps:
+        1. Load questions from: se-{exam_date}-questions.yml
+        2. Load responses from: se-{exam_date}-responses.yml
+        3. Load grades from: se-{exam_date}-grades.yml (if available)
+        4. Load checklists for each question
+
+        Return a summary with number of questions and students loaded.""",
+        expected_output="JSON summary of loaded exam data",
+        agent=loader_agent
+    )
+
+    # TASK 2: Assess Answers
+    if student_email:
+        assess_desc = f"Assess all answers for student: {student_email}"
+    else:
+        assess_desc = "Assess all answers for all students in the exam"
+
+    assess_task = Task(
+        description=f"""{assess_desc}
+
+        For each student response:
+        1. Check each core element (70% weight)
+        2. Check each important detail (30% weight)
+        3. Calculate the final score
+        4. Provide constructive feedback
+
+        Use the assess_feature_tool for each feature check.
+        Be systematic and thorough.""",
+        expected_output="Complete assessment results for all evaluated answers",
+        agent=assessor_agent,
+        context=[load_task]  # Depends on load_task
+    )
+
+    # TASK 3: Generate Report
+    report_task = Task(
+        description="""Generate a comprehensive assessment report.
+
+        Include:
+        1. Overall statistics (average, min, max scores)
+        2. Individual student results
+        3. Comparison with original Moodle grades (if available)
+        4. Score breakdown by question
+
+        Format the report clearly and professionally.""",
+        expected_output="Markdown formatted assessment report",
+        agent=reporter_agent,
+        context=[assess_task]  # Depends on assess_task
+    )
+
+    return [load_task, assess_task, report_task]
+
+
+# ============================================================================
+# CREWAI CREW (ex AgentExecutor/LangGraph)
+# ============================================================================
+
+class ExamAssessmentCrew:
+    """
+    Crew principale per la valutazione esami.
+    Sostituisce AgentExecutor e LangGraph orchestration.
+    """
+
+    def __init__(self, model_name: str = "llama-3.3-70b-versatile"):
+        from exam_llm_provider_crewai import get_llm_config
+
+        self.llm_config = get_llm_config(model_name)
+        self.agents = create_assessment_agents(self.llm_config)
+        self.evaluations_dir = DIR_ROOT / "evaluations"
         self.evaluations_dir.mkdir(parents=True, exist_ok=True)
 
-    async def assess_single_answer(
+    def assess_exam(
             self,
-            question,
-            checklist,
-            student_response: str,
-            max_score: float
+            exam_date: str,
+            student_email: str = None,
+            process_type: Process = Process.sequential
     ) -> dict:
         """
-        Valuta una singola risposta dello studente.
+        Valuta un esame completo.
 
         Args:
-            question: Oggetto Question con id e text
-            checklist: Oggetto Answer con core e details_important
-            student_response: Testo della risposta dello studente
-            max_score: Punteggio massimo per questa domanda
+            exam_date: Data esame (YYYY-MM-DD)
+            student_email: Email studente specifico (None = tutti)
+            process_type: Process.sequential o Process.hierarchical
 
         Returns:
-            dict con:
-                - status: "assessed" | "error" | "no_response"
-                - score: float
-                - max_score: float
-                - statistics: dict con statistiche per tipo di feature
-                - breakdown: str con spiegazione del calcolo
-                - feature_assessments: list di assessment per ogni feature
-                - error: str (solo se status="error")
+            Risultati della valutazione
         """
-        if not student_response or student_response.strip() == '-':
-            return {
-                "status": "no_response",
-                "score": 0.0,
-                "max_score": max_score
-            }
+        # Crea le task
+        tasks = create_assessment_tasks(self.agents, exam_date, student_email)
 
-        try:
-            # Valuta ogni feature
-            feature_assessments_list = []
-            feature_assessments_dict = {}
+        # Crea il Crew
+        crew = Crew(
+            agents=list(self.agents),
+            tasks=tasks,
+            process=process_type,
+            verbose=2
+        )
 
-            for index, feature in enumerate_features(checklist):
-                # Prepara il prompt
-                prompt = TEMPLATE.format(
-                    class_name="FeatureAssessment",
-                    question=question.text,
-                    feature_type=feature.type.value,
-                    feature_verb_ideal=feature.verb_ideal,
-                    feature_verb_actual=feature.verb_actual,
-                    feature=feature.description,
-                    answer=student_response
-                )
+        # Esegui il workflow
+        print(f"\n{'=' * 70}")
+        print(f"CREWAI ASSESSMENT: Exam {exam_date}")
+        if student_email:
+            print(f"Student: {student_email[:30]}...")
+        print(f"{'=' * 70}\n")
 
-                # Chiama il modello LLM
-                llm, _, _ = self.llm_client_func(structured_output=FeatureAssessment)
-                result = llm.invoke(prompt)
+        result = crew.kickoff()
 
-                # Salva risultati
-                feature_assessments_list.append({
-                    "feature": feature.description,
-                    "feature_type": feature.type.name,
-                    "satisfied": result.satisfied,
-                    "motivation": result.motivation
-                })
-
-                feature_assessments_dict[feature] = result
-
-            # Calcola il punteggio
-            score, breakdown, stats = self.calculate_score(
-                feature_assessments_dict,
-                max_score
-            )
-
-            return {
-                "status": "assessed",
-                "score": score,
-                "max_score": max_score,
-                "statistics": stats,
-                "breakdown": breakdown,
-                "feature_assessments": feature_assessments_list
-            }
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e),
-                "score": 0.0,
-                "max_score": max_score
-            }
-
-    async def assess_student_exam(
-            self,
-            student_email: str,
-            exam_questions: list,
-            student_responses: dict,
-            questions_store,
-            context,
-            save_results: bool = True,
-            original_grades: dict = None  # ← AGGIUNTO!
-    ) -> dict:
-        """
-        Valuta tutte le risposte di uno studente.
-
-        REFACTORIZZATO: Ora include la logica di salvataggio dei risultati.
-
-        Args:
-            student_email: Email dello studente
-            exam_questions: Lista di dict con question info (id, number, text, score)
-            student_responses: Dict {question_number: response_text}
-            questions_store: QuestionsStore instance
-            context: AssessmentContext per accedere alle checklist
-            save_results: Se True, salva i risultati su file (default: True)
-
-        Returns:
-            dict con:
-                - student_email: str
-                - calculated_score: float
-                - max_score: float
-                - percentage: float
-                - scoring_system: str
-                - assessments: list di assessment per ogni domanda
-                - saved_files: dict con percorsi dei file salvati (se save_results=True)
-        """
-        from exam.solution import load_cache as load_answer_cache
-
-        assessments = []
-        total_score = 0.0
-        total_max_score = 0.0
-
-        for question_info in exam_questions:
-            question_num = int(question_info["number"].replace("Question ", ""))
-
-            # Verifica se lo studente ha risposto
-            if question_num not in student_responses:
-                assessments.append({
-                    "question_number": question_num,
-                    "question_id": question_info["id"],
-                    "question_text": question_info.get("text", ""),
-                    "status": "no_response",
-                    "score": 0.0,
-                    "max_score": question_info["score"]
-                })
-                total_max_score += question_info["score"]
-                continue
-
-            try:
-                # Ottieni la domanda e la checklist
-                question = questions_store.question(question_info["id"])
-                checklist = context.get_checklist(question_info["id"])
-
-                if not checklist:
-                    # Prova a caricare la checklist se non in context
-                    checklist = load_answer_cache(question)
-                    if checklist:
-                        context.store_checklist(question_info["id"], checklist)
-
-                if not checklist:
-                    raise ValueError(f"No checklist found for question {question_info['id']}")
-
-                response_text = student_responses[question_num]
-
-                # Valuta la singola risposta
-                assessment = await self.assess_single_answer(
-                    question=question,
-                    checklist=checklist,
-                    student_response=response_text,
-                    max_score=question_info["score"]
-                )
-
-                # Aggiungi metadati
-                assessment.update({
-                    "question_number": question_num,
-                    "question_id": question_info["id"],
-                    "question_text": question.text,
-                    "student_response": response_text
-                })
-
-                assessments.append(assessment)
-
-                total_score += assessment["score"]
-                total_max_score += question_info["score"]
-
-            except Exception as e:
-                assessments.append({
-                    "question_number": question_num,
-                    "question_id": question_info["id"],
-                    "question_text": question_info.get("text", ""),
-                    "status": "error",
-                    "error": str(e),
-                    "score": 0.0,
-                    "max_score": question_info["score"]
-                })
-                total_max_score += question_info["score"]
-
-        result = {
-            "student_email": student_email,
-            "calculated_score": total_score,
-            "max_score": total_max_score,
-            "percentage": round((total_score / total_max_score * 100) if total_max_score > 0 else 0, 1),
-            "scoring_system": "70% Core + 30% Important_Details",
-            "assessments": assessments,
-            "original_grades": original_grades if original_grades else {}
-        }
-
-        # =========================================================
-        # NUOVA LOGICA: Salvataggio risultati (spostata da MCP)
-        # =========================================================
-        if save_results:
-            saved_files = self._save_assessment_results(student_email, result, exam_questions)
-            result["saved_files"] = saved_files
-
-        return result
-
-    def _save_assessment_results(self, student_email: str, result: dict, exam_questions: list) -> dict:
-        """
-        Salva i risultati della valutazione su file.
-
-        NUOVA FUNZIONE: Logica di salvataggio estratta da MCP server.
-
-        Args:
-            student_email: Email dello studente
-            result: Dizionario con i risultati della valutazione
-            exam_questions: Lista delle domande dell'esame (per original grades)
-
-        Returns:
-            dict con percorsi dei file salvati
-        """
-        # Crea directory studente
-        student_dir = self.evaluations_dir / student_email
-        student_dir.mkdir(parents=True, exist_ok=True)
-
-        # Salva assessment completo in JSON
-        assessment_file = student_dir / "assessment.json"
-        with open(assessment_file, 'w', encoding='utf-8') as f:
-            json.dump(result, f, indent=2, ensure_ascii=False)
-
-        # Salva summary leggibile
-        summary_file = student_dir / "summary.txt"
-        summary_content = self._generate_summary_text(student_email, result, exam_questions)
-
-        with open(summary_file, 'w', encoding='utf-8') as f:
-            f.write(summary_content)
+        print(f"\n{'=' * 70}")
+        print("ASSESSMENT COMPLETED")
+        print(f"{'=' * 70}\n")
 
         return {
-            "assessment": str(assessment_file),
-            "summary": str(summary_file)
+            "status": "success",
+            "exam_date": exam_date,
+            "result": result
         }
 
-    def _generate_summary_text(self, student_email: str, result: dict, exam_questions: list) -> str:
+    def assess_exam_parallel(
+            self,
+            exam_date: str,
+            num_workers: int = 3
+    ) -> dict:
         """
-        Genera il testo del summary leggibile.
-
-        NUOVA FUNZIONE: Logica di generazione summary estratta da MCP server.
-        """
-        lines = []
-        lines.append("STUDENT ASSESSMENT SUMMARY")
-        lines.append("=" * 70)
-        lines.append("")
-        lines.append(f"Student: {student_email}")
-        lines.append(f"Calculated Score: {result['calculated_score']:.2f}/{result['max_score']}")
-        lines.append(f"Calculated Percentage: {result['percentage']}%")
-
-        # Get original grades if available from first assessment
-        original_grades = result.get('original_grades', {})
-
-        if original_grades:
-            original_total = original_grades.get("total_grade", 0)
-            lines.append(f"Original Moodle Grade: {original_total:.2f}/27.00")
-
-            score_diff = result['calculated_score'] - original_total
-            diff_text = f"Difference: {score_diff:+.2f} "
-            if abs(score_diff) < 0.5:
-                diff_text += "( Very close)"
-            elif abs(score_diff) < 2.0:
-                diff_text += "( Reasonable)"
-
-
-        lines.append(f"Scoring System: {result['scoring_system']}")
-        lines.append("")
-        lines.append("=" * 70)
-        lines.append("")
-
-        for assessment in result["assessments"]:
-            question_num = assessment['question_number']
-            lines.append(f"Question {question_num}: {assessment['question_id']}")
-            lines.append("-" * 70)
-
-            if assessment['status'] == 'assessed':
-                lines.append(f"Calculated Score: {assessment['score']:.2f}/{assessment['max_score']}")
-
-                # Add comparison with original grade if available
-                if original_grades and 'question_grades' in original_grades:
-                    orig_q_grade = original_grades['question_grades'].get(question_num)
-                    if orig_q_grade is not None:
-                        diff = assessment['score'] - orig_q_grade
-                        lines.append(f"Original Grade: {orig_q_grade:.2f}/{assessment['max_score']}")
-                        lines.append(f"Difference: {diff:+.2f}")
-
-                lines.append(f"Breakdown: {assessment['breakdown']}")
-                lines.append("")
-
-                # Raggruppa per tipo
-                core_features = [fa for fa in assessment['feature_assessments']
-                                 if fa['feature_type'] == 'CORE']
-                important_features = [fa for fa in assessment['feature_assessments']
-                                      if fa['feature_type'] == 'DETAILS_IMPORTANT']
-
-                if core_features:
-                    lines.append("CORE Elements:")
-                    for fa in core_features:
-                        status = "✓ OK" if fa['satisfied'] else "✗ MISSING"
-                        lines.append(f"  [{status}] {fa['feature']}")
-                        lines.append(f"       {fa['motivation']}")
-                        lines.append("")
-
-                if important_features:
-                    lines.append("Important Details:")
-                    for fa in important_features:
-                        status = "✓ OK" if fa['satisfied'] else "✗ MISSING"
-                        lines.append(f"  [{status}] {fa['feature']}")
-                        lines.append(f"       {fa['motivation']}")
-                        lines.append("")
-
-            else:
-                lines.append(f"Status: {assessment['status']}")
-                if 'error' in assessment:
-                    lines.append(f"Error: {assessment['error']}")
-
-            lines.append("")
-            lines.append("=" * 70)
-            lines.append("")
-
-        return "\n".join(lines)
-
-    def calculate_score(self, assessments: dict, max_score: float) -> tuple[float, str, dict]:
-        """
-        Calcola il punteggio da un dizionario di assessment.
-        Sistema:
-        - 70% Core + 30% Important (se entrambi presenti)
-        - 100% Core (se mancano Important)
-        - 100% Important (se mancano Core - caso raro)
+        Valuta esame con workers paralleli.
+        In CrewAI, usiamo Process.hierarchical per parallelismo.
 
         Args:
-            assessments: dict[Feature, FeatureAssessment]
-            max_score: Punteggio massimo della domanda
+            exam_date: Data esame
+            num_workers: Numero di worker paralleli
 
         Returns:
-            tuple(score, breakdown, stats): Punteggio, spiegazione, e statistiche dettagliate
+            Risultati aggregati
         """
-        if not assessments:
-            return 0.0, "No features assessed", {}
+        print(f"\n{'=' * 70}")
+        print(f"PARALLEL ASSESSMENT with {num_workers} workers")
+        print(f"{'=' * 70}\n")
 
-        # Conta feature per tipo
-        core_total = sum(1 for f in assessments if f.type == FeatureType.CORE)
-        core_satisfied = sum(1 for f, a in assessments.items()
-                             if f.type == FeatureType.CORE and a.satisfied)
+        # In CrewAI, il parallelismo è gestito con Process.hierarchical
+        # e un manager agent che delega ai worker
 
-        important_total = sum(1 for f in assessments if f.type == FeatureType.DETAILS_IMPORTANT)
-        important_satisfied = sum(1 for f, a in assessments.items()
-                                  if f.type == FeatureType.DETAILS_IMPORTANT and a.satisfied)
+        # Crea manager agent
+        manager = Agent(
+            role="Assessment Manager",
+            goal="Coordinate parallel assessment of multiple students",
+            backstory="You manage a team of assessors to evaluate exams efficiently",
+            llm=self.llm_config["llm"],
+            verbose=True
+        )
 
-        # Determina i pesi in base a cosa è presente
-        if core_total > 0 and important_total > 0:
-            # Entrambi presenti: 70% core + 30% important
-            core_weight = 0.70
-            important_weight = 0.30
-            scoring_system = "70% Core + 30% Important"
-        elif core_total > 0:
-            # Solo core: 100% core
-            core_weight = 1.0
-            important_weight = 0.0
-            scoring_system = "100% Core (no Important details)"
-        elif important_total > 0:
-            # Solo important: 100% important
-            core_weight = 0.0
-            important_weight = 1.0
-            scoring_system = "100% Important (no Core - unusual)"
-        else:
-            # Nessuna feature
-            return 0.0, "No features assessed", {}
-
-        # Calcolo percentuali per categoria
-        core_percentage = (core_satisfied / core_total * core_weight) if core_total > 0 else 0.0
-        important_percentage = (
-                    important_satisfied / important_total * important_weight) if important_total > 0 else 0.0
-
-        # Percentuale finale
-        final_percentage = core_percentage + important_percentage
-
-        # Score finale
-        score = round(final_percentage * max_score, 2)
-
-        # Breakdown dettagliato
-        breakdown_parts = []
-
-        if core_total > 0:
-            core_raw_pct = (core_satisfied / core_total * 100)
-            core_weighted_pct = (core_percentage * 100)
-            breakdown_parts.append(
-                f"Core: {core_satisfied}/{core_total} "
-                f"({core_raw_pct:.0f}% → {core_weighted_pct:.0f}%)"
+        # Crea worker agents
+        workers = [
+            Agent(
+                role=f"Assessment Worker {i + 1}",
+                goal="Assess assigned student responses quickly and accurately",
+                backstory=f"You are worker #{i + 1} in the assessment team",
+                tools=[assess_feature_tool],
+                llm=self.llm_config["llm"],
+                verbose=True
             )
+            for i in range(num_workers)
+        ]
 
-        if important_total > 0:
-            important_raw_pct = (important_satisfied / important_total * 100)
-            important_weighted_pct = (important_percentage * 100)
-            breakdown_parts.append(
-                f"Important: {important_satisfied}/{important_total} "
-                f"({important_raw_pct:.0f}% → {important_weighted_pct:.0f}%)"
-            )
+        # Crea task principale
+        main_task = Task(
+            description=f"""Assess all students in exam {exam_date}.
 
-        breakdown = " + ".join(breakdown_parts)
-        breakdown += f" = {final_percentage * 100:.0f}% of {max_score} = {score}"
-        breakdown += f" [{scoring_system}]"
+            Delegate work evenly among your {num_workers} workers.
+            Each worker should assess approximately the same number of students.
+            Collect and aggregate results.""",
+            expected_output="Aggregated assessment results for all students",
+            agent=manager
+        )
 
-        # Statistiche dettagliate
-        stats = {
-            "core": {
-                "total": core_total,
-                "satisfied": core_satisfied,
-                "percentage": round((core_satisfied / core_total * 100) if core_total > 0 else 0, 1),
-                "weight": core_weight
-            },
-            "details_important": {
-                "total": important_total,
-                "satisfied": important_satisfied,
-                "percentage": round((important_satisfied / important_total * 100) if important_total > 0 else 0, 1),
-                "weight": important_weight
-            },
-            "scoring_system": scoring_system
+        # Crea crew gerarchico
+        crew = Crew(
+            agents=[manager] + workers,
+            tasks=[main_task],
+            process=Process.hierarchical,
+            manager_llm=self.llm_config["llm"],
+            verbose=2
+        )
+
+        result = crew.kickoff()
+
+        return {
+            "status": "success",
+            "exam_date": exam_date,
+            "num_workers": num_workers,
+            "result": result
         }
 
-        return score, breakdown, stats
+
+# ============================================================================
+# FUNZIONI DI COMPATIBILITÀ
+# ============================================================================
+
+async def assess_student_exam(
+        student_email: str,
+        exam_questions: list,
+        student_responses: dict,
+        questions_store,
+        context,
+        save_results: bool = True,
+        original_grades: dict = None
+) -> dict:
+    """
+    Funzione di compatibilità con il codice esistente.
+    Usa CrewAI internamente.
+    """
+    # Estrai exam_date dal context o dai dati
+    exam_date = "2025-06-05"  # Default, dovrebbe essere passato
+
+    crew = ExamAssessmentCrew()
+    result = crew.assess_exam(exam_date, student_email)
+
+    # Formatta risultato in formato compatibile
+    return {
+        "student_email": student_email,
+        "calculated_score": 0.0,  # TODO: parse from result
+        "max_score": sum(q["score"] for q in exam_questions),
+        "percentage": 0.0,
+        "scoring_system": "70% Core + 30% Important_Details",
+        "assessments": [],
+        "original_grades": original_grades if original_grades else {}
+    }

@@ -1,0 +1,26 @@
+#MCP
+mcp>=1.0.0
+
+# CrewAI - Multi-agent orchestration
+crewai>=0.28.0
+crewai-tools>=0.4.0
+
+# LLM providers for CrewAI
+langchain-groq>=0.1.0
+
+# HuggingFace for embeddings
+sentence-transformers>=2.2.0
+transformers>=4.30.0
+torch>=2.0.0
+
+# Vector store
+sqlitedict>=2.1.0
+sqlite-vec
+
+# Data processing
+pydantic>=2.0.0
+PyYAML>=6.0
+markdown>=3.4.0
+
+# Constraint solving (for test generation)
+z3-solver>=4.12.0

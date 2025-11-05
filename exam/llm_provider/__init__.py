@@ -1,7 +1,11 @@
+"""
+LLM Provider per CrewAI.
+CrewAI gestisce i modelli LLM internamente negli agenti,
+ma manteniamo questa configurazione per coerenza.
+"""
 import getpass
 import os
 from langchain_groq import ChatGroq
-
 
 KEY_GROQ_API_KEY = "GROQ_API_KEY"
 
@@ -13,68 +17,51 @@ def ensure_groq_api_key():
     return os.environ[KEY_GROQ_API_KEY]
 
 
-def llm_client(model_name: str = "llama-3.3-70b-versatile", model_provider: str = "groq", structured_output: type = None):
+def get_llm_config(model_name: str = "llama-3.3-70b-versatile"):
     """
-    Creates an LLM client configured for Groq.
-    
+    Ottiene la configurazione LLM per CrewAI.
+
     Args:
-        model_name: llama-3.3-70b
-        model_provider: Groq
-    
+        model_name: Nome del modello (default: llama-3.3-70b-versatile)
+
     Returns:
-        Tuple of (llm_instance, model_name, model_provider)
+        Dict con configurazione per CrewAI Agent
     """
     # Model configurations
     model_configs = {
         "llama-3.3": "llama-3.3-70b-versatile",
         "llama-8b": "llama-3.1-8b-instant",
-        "llama-4":"meta-llama/llama-4-maverick-17b-128e-instruct",
-        "openAI":"openai/gpt-oss-120b",
-        "gwen":"qwen/qwen3-32b"
+        "llama-4": "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "openAI": "openai/gpt-oss-120b",
+        "gwen": "qwen/qwen3-32b"
     }
-    
+
     # Use model_name directly if it's a full Groq model name
-    if model_name and model_name in model_configs:
+    if model_name in model_configs:
         model_name = model_configs[model_name]
     elif not model_name:
-        model_name = "llama-3.3-70b-versatile"  # Default
-    
-    # For compatibility
-    if not model_provider:
-        model_provider = "groq"
-    
+        model_name = "llama-3.3-70b-versatile"
+
     ensure_groq_api_key()
-    
-    # Create ChatGroq instance
+
+    # Crea l'istanza LLM per CrewAI
     llm = ChatGroq(
         model=model_name,
         groq_api_key=os.environ[KEY_GROQ_API_KEY],
-        temperature=0.1,  # Lower temperature for more consistent grading
+        temperature=0.1,
         max_tokens=8000,
     )
-    
-    if structured_output is not None:
-        llm = llm.with_structured_output(structured_output)
-    
-    return llm, model_name, model_provider
+
+    return {
+        "llm": llm,
+        "model_name": model_name,
+        "provider": "groq"
+    }
 
 
-class AIOracle:
-    """Base class for AI-powered operations using Groq."""
-    
-    def __init__(self, model_name: str = None, model_provider: str = None, structured_output: type = None):
-        self.__llm, self.__model_name, self.__model_provider = llm_client(
-            model_name, model_provider, structured_output
-        )
-
-    @property
-    def llm(self):
-        return self.__llm
-
-    @property
-    def model_name(self):
-        return self.__model_name
-
-    @property
-    def model_provider(self):
-        return self.__model_provider
+def get_llm(model_name: str = "llama-3.3-70b-versatile"):
+    """
+    Ottiene l'istanza LLM diretta (compatibilità con codice esistente).
+    """
+    config = get_llm_config(model_name)
+    return config["llm"]
