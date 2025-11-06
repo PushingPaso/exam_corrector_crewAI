@@ -1,12 +1,29 @@
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import SQLiteVec
-from exam import DIR_ROOT
-from pydantic import BaseModel
+"""
+Modulo RAG (Retrieval-Augmented Generation)
+Tradotto per CrewAI senza dipendenze da LangChain.
+
+SOSTITUZIONE: Abbandono di 'sqlite-vec' (problematico) in favore di 'chromadb'.
+'chromadb' è una libreria standard per la persistenza di vector store.
+"""
 import re
+import shutil
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any
+
+# Import nativi (NO LANGCHAIN)
+from sentence_transformers import SentenceTransformer
+import chromadb # Importa la nuova libreria
+
+from exam import DIR_ROOT
 
 
 DIR_CONTENT = DIR_ROOT / "content"
-FILE_DB = DIR_ROOT / "slides-rag.db"
+# MODIFICA: Chroma salva in una cartella, non in un file.
+# Rinomino la variabile per chiarezza.
+DIR_RAG_DB = DIR_ROOT / "slides_rag_db"
+# Esporta la nuova variabile per coerenza con __main__.py
+FILE_DB = DIR_RAG_DB
+
 MARKDOWN_FILES = list(DIR_CONTENT.glob("**/_index.md"))
 REGEX_SLIDE_DELIMITER = re.compile(r"^\s*(---|\+\+\+)")
 
@@ -21,6 +38,17 @@ class Slide(BaseModel):
     def lines_count(self):
         return self.content.count("\n") + 1 if self.content else 0
 
+
+class Document(BaseModel):
+
+
+    page_content: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+# ============================================================================
+# CARICAMENTO SLIDE (invariato)
+# ============================================================================
 
 def all_slides(files = None):
     if files is None:
@@ -57,121 +85,172 @@ def all_slides(files = None):
             )
 
 
-def huggingface_embeddings(model=None):
+# ============================================================================
+# GESTIONE EMBEDDING (con sentence_transformers, invariato)
+# ============================================================================
+
+def huggingface_embeddings(model=None) -> SentenceTransformer:
     """
-    Creates HuggingFace embeddings model.
+    Crea un modello di embeddings HuggingFace usando sentence_transformers.
+    NON USA LANGCHAIN.
 
     Args:
-        model: Model identifier or size hint
-               Recommended: 'bge-large' for best accuracy
-               Default: bge-base (balance accuracy/speed)
+        model: Hint per il modello (es. 'bge-large')
 
     Returns:
-        HuggingFaceEmbeddings instance
+        Istanza di SentenceTransformer
     """
     if not model:
-        model = "bge-large"  # Default più potente del vecchio
+        model = "bge-large"
 
     model = model.lower()
+    device = 'cpu'
 
-    # STATO DELL'ARTE 2024-2025
     if model == "bge-large" or model == "best":
-        # Massima accuratezza (MTEB: 64.2)
         model_name = "BAAI/bge-large-en-v1.5"
-        model_kwargs = {
-            'device': 'cpu',  # o 'cuda' se GPU disponibile
-        }
-        encode_kwargs = {
-            'normalize_embeddings': True,
-            'batch_size': 32,  # Ottimizzato per large model
-        }
-
     elif model == "bge-base" or model == "recommended":
-        # Ottimo compromesso accuratezza/velocità (MTEB: 63.5)
         model_name = "BAAI/bge-base-en-v1.5"
-        model_kwargs = {'device': 'cpu'}
-        encode_kwargs = {
-            'normalize_embeddings': True,
-            'batch_size': 64,
-        }
-
     elif model == "bge-small" or model == "fast":
-        # Veloce ma comunque superiore a MiniLM (MTEB: 62.1)
         model_name = "BAAI/bge-small-en-v1.5"
-        model_kwargs = {'device': 'cpu'}
-        encode_kwargs = {
-            'normalize_embeddings': True,
-            'batch_size': 128,
-        }
-
-    # ALTERNATIVE (per confronto nella tesi)
     elif model == "nomic":
-        # Open source + ottimo per long context
         model_name = "nomic-ai/nomic-embed-text-v1"
-        model_kwargs = {'device': 'cpu', 'trust_remote_code': True}
-        encode_kwargs = {'normalize_embeddings': True}
-
     elif model == "gte-large":
-        # Alibaba, molto buono per retrieval
         model_name = "thenlper/gte-large"
-        model_kwargs = {'device': 'cpu'}
-        encode_kwargs = {'normalize_embeddings': True}
-
-    # LEGACY (per baseline comparison)
     elif model == "legacy-small" or "mini" in model:
-        # Il tuo attuale default (BASELINE)
         model_name = "sentence-transformers/all-MiniLM-L6-v2"
-        model_kwargs = {'device': 'cpu'}
-        encode_kwargs = {'normalize_embeddings': True}
-
     elif model == "legacy-large" or "mpnet" in model:
-        # Il tuo attuale "large" (BASELINE)
         model_name = "sentence-transformers/all-mpnet-base-v2"
-        model_kwargs = {'device': 'cpu'}
-        encode_kwargs = {'normalize_embeddings': True}
-
     elif model.startswith("BAAI/") or model.startswith("sentence-transformers/") or "/" in model:
-        # Direct model name provided
         model_name = model
-        model_kwargs = {'device': 'cpu'}
-        encode_kwargs = {'normalize_embeddings': True}
-
     else:
-        raise ValueError(
-            f"Unknown model hint: {model}. "
-            "Use 'bge-large', 'bge-base', 'bge-small', 'nomic', 'gte-large', "
-            "'legacy-small', 'legacy-large', or a full HuggingFace model name."
-        )
+        raise ValueError(f"Unknown model hint: {model}")
 
-    print(f"# Loading embeddings model: {model_name}")
+    print(f"# Loading embeddings model: {model_name} (via sentence-transformers)")
 
-    return HuggingFaceEmbeddings(
-        model_name=model_name,
-        model_kwargs=model_kwargs,
-        encode_kwargs=encode_kwargs
+    return SentenceTransformer(
+        model_name_or_path=model_name,
+        device=device,
+        trust_remote_code=True if model == "nomic" else False
     )
 
 
+# ============================================================================
+# WRAPPER VECTOR STORE (ora usa ChromaDB)
+# ============================================================================
+
+class CrewAIVectorStore:
+    """
+    Wrapper per 'chromadb.Collection' che mima l'interfaccia
+    del VectorStore di LangChain per compatibilità.
+    """
+
+    def __init__(self, db_path: str, table_name: str, embed_model: SentenceTransformer):
+        self._embed_model = embed_model
+
+        # Inizializza il client persistente di Chroma
+        # Salverà i dati nella cartella specificata
+        self._client = chromadb.PersistentClient(path=db_path)
+
+        # Crea un "embedding function" wrapper per Chroma
+        class ChromaEmbeddingFunction(chromadb.EmbeddingFunction):
+            def __call__(self, input: chromadb.Documents) -> chromadb.Embeddings:
+                return embed_model.encode(input, normalize_embeddings=True).tolist()
+
+        # Ottieni o crea la "collection" (simile a una tabella)
+        self._collection = self._client.get_or_create_collection(
+            name=table_name,
+            embedding_function=ChromaEmbeddingFunction()
+        )
+
+    def similarity_search(self, query: str, k: int = 5) -> List[Document]:
+        """
+        Esegue la ricerca e formatta i risultati come oggetti Document compatibili.
+        """
+        results = []
+        try:
+            # Esegui la query
+            query_results = self._collection.query(
+                query_texts=[query],
+                n_results=k
+            )
+
+            # Estrai e formatta i risultati
+            docs_list = query_results.get('documents', [[]])[0]
+            metas_list = query_results.get('metadatas', [[]])[0]
+
+            for i, text_content in enumerate(docs_list):
+                metadata = metas_list[i] if i < len(metas_list) else {}
+                results.append(Document(
+                    page_content=text_content,
+                    metadata=metadata
+                ))
+
+        except Exception as e:
+            print(f"Error during RAG search (ChromaDB): {e}")
+            return [Document(page_content=f"Error during search: {e}", metadata={})]
+
+        return results
+
+    def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]] = None):
+        """
+        Aggiunge testi al vector store.
+        Chroma richiede ID univoci, li generiamo.
+        """
+        # Genera ID univoci
+        ids = [f"doc_{hash(txt)}_{i}" for i, txt in enumerate(texts)]
+
+        try:
+            self._collection.add(
+                documents=texts,
+                metadatas=metadatas,
+                ids=ids
+            )
+        except chromadb.errors.IDAlreadyExistsError:
+            print("Warning: Some documents were already present and were skipped.")
+            # Gestisci l'aggiunta incrementale se necessario (qui usiamo 'upsert')
+            self._collection.upsert(
+                documents=texts,
+                metadatas=metadatas,
+                ids=ids
+            )
+        except Exception as e:
+            print(f"Error adding texts to ChromaDB: {e}")
+
+
+    def get_dimensionality(self) -> int:
+        """
+        Restituisce la dimensionalità richiesta dal resto del codice.
+        La otteniamo direttamente dal modello di embedding.
+        """
+        try:
+            dim = self._embed_model.get_sentence_embedding_dimension()
+            if dim:
+                return dim
+            # Fallback
+            return len(self._embed_model.encode("test", normalize_embeddings=True))
+        except Exception:
+            return 0 # Errore
+
+# ============================================================================
+# FUNZIONE PRINCIPALE (Factory)
+# ============================================================================
+
 def sqlite_vector_store(
-        db_file: str = str(FILE_DB), 
-        model: str = None, 
-        table_name: str = "se_slides"):
+        db_file: str = str(FILE_DB), # Mantiene il nome argomento per compatibilità
+        model: str = None,
+        table_name: str = "se_slides") -> CrewAIVectorStore:
     """
-    Creates or loads a SQLite vector store with HuggingFace embeddings.
-    
-    Args:
-        db_file: Path to SQLite database file
-        model: Embedding model hint or name
-        table_name: Name of the table in the database
-    
-    Returns:
-        SQLiteVec instance
+    Crea o carica un vector store persistente usando ChromaDB.
+    MANTIENE il nome 'sqlite_vector_store' per compatibilità con il
+    resto del codice, anche se ora usa ChromaDB.
     """
-    embeddings = huggingface_embeddings(model)
-    
-    return SQLiteVec(
-        db_file=db_file,
-        embedding=embeddings,
-        table=table_name,
-        connection=None,
+    # 1. Ottieni il modello SentenceTransformer
+    embeddings_model = huggingface_embeddings(model)
+
+    # 2. Crea e restituisci il wrapper
+    #    Nota: db_file (che ora è DIR_RAG_DB) è una cartella
+    return CrewAIVectorStore(
+        db_path=db_file,
+        table_name=table_name,
+        embed_model=embeddings_model,
     )

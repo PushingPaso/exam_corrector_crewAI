@@ -10,7 +10,6 @@ from crewai import Agent, Task, Crew, Process
 from crewai.tools import tool
 from pydantic import BaseModel, Field
 
-# Import esistenti
 from exam import DIR_ROOT, get_questions_store
 from exam.solution import load_cache as load_answer_cache
 
@@ -117,7 +116,7 @@ def assess_feature_tool(
     Returns:
         JSON with assessment result
     """
-    from exam_llm_provider_crewai import get_llm
+    from exam.llm_provider import get_llm
 
     try:
         llm = get_llm()
@@ -294,7 +293,7 @@ class ExamAssessmentCrew:
     """
 
     def __init__(self, model_name: str = "llama-3.3-70b-versatile"):
-        from exam_llm_provider_crewai import get_llm_config
+        from exam.llm_provider import get_llm_config
 
         self.llm_config = get_llm_config(model_name)
         self.agents = create_assessment_agents(self.llm_config)
@@ -326,7 +325,7 @@ class ExamAssessmentCrew:
             agents=list(self.agents),
             tasks=tasks,
             process=process_type,
-            verbose=2
+            verbose=True
         )
 
         # Esegui il workflow
@@ -410,7 +409,7 @@ class ExamAssessmentCrew:
             tasks=[main_task],
             process=Process.hierarchical,
             manager_llm=self.llm_config["llm"],
-            verbose=2
+            verbose=True
         )
 
         result = crew.kickoff()
@@ -449,7 +448,7 @@ async def assess_student_exam(
     # Formatta risultato in formato compatibile
     return {
         "student_email": student_email,
-        "calculated_score": 0.0,  # TODO: parse from result
+        "calculated_score": 0.0,
         "max_score": sum(q["score"] for q in exam_questions),
         "percentage": 0.0,
         "scoring_system": "70% Core + 30% Important_Details",

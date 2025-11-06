@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from yaml import safe_dump, safe_load
 
 from exam import DIR_ROOT, Question
-from exam.llm_provider import get_llm_config
+from exam.llm_provider import get_llm
 from exam.rag import sqlite_vector_store
 
 
@@ -142,14 +142,14 @@ class ChecklistGenerationCrew:
     Sostituisce SolutionProvider basato su LangChain.
     """
 
-    def __init__(self, model_name: str = "llama-3.3-70b-versatile"):
+    def __init__(self):
         """
         Inizializza il crew per generazione checklist.
 
         Args:
             model_name: Modello LLM da usare
         """
-        self.llm_config = get_llm_config(model_name)
+        self.llm_config = get_llm()
         self.vector_store = None
 
         # Verifica disponibilità RAG
@@ -175,7 +175,7 @@ class ChecklistGenerationCrew:
             You find the most relevant slides and lecture notes that explain
             the concepts being tested in each exam question.""",
             tools=[search_course_material] if self.use_rag else [],
-            llm=self.llm_config["llm"],
+            llm=self.llm_config,
             verbose=True,
             allow_delegation=False
         )
@@ -197,7 +197,7 @@ class ChecklistGenerationCrew:
 
             Your checklists are specific, verifiable, and actionable.
             You avoid vague or fluffy criteria.""",
-            llm=self.llm_config["llm"],
+            llm=self.llm_config,
             verbose=True,
             allow_delegation=False
         )
@@ -274,7 +274,7 @@ Rules:
             expected_output="A structured Answer object with core and details_important lists",
             agent=designer,
             context=tasks if self.use_rag else None,
-            output_pydantic=Answer  # ✨ Output strutturato!
+            output_pydantic=Answer  # Output strutturato!
         )
         tasks.append(design_task)
 
@@ -283,7 +283,7 @@ Rules:
             agents=[researcher, designer] if self.use_rag else [designer],
             tasks=tasks,
             process=Process.sequential,
-            verbose=2
+            verbose=True
         )
 
         # Esegui

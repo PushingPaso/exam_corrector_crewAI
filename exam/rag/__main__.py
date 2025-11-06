@@ -1,6 +1,6 @@
-from exam.rag import *
-import sys
 import argparse
+
+from exam.rag import *
 
 
 def main():
@@ -20,9 +20,10 @@ def main():
         # Force recreate if requested
         if args.force:
             import os
+            import shutil
             if os.path.exists(FILE_DB):
-                print(f"# Deleting existing database: {FILE_DB}")
-                os.remove(FILE_DB)
+                print(f"# Deleting existing database directory: {FILE_DB}")
+                shutil.rmtree(FILE_DB)
 
         # Create vector store with specified model
         vector_store = sqlite_vector_store(model=args.model)
