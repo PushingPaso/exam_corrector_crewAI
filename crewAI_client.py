@@ -5,18 +5,14 @@ Sostituisce il sistema basato su LangChain agents.
 
 import asyncio
 import os
-from pathlib import Path
 
 from crewai import Agent, Task, Crew, Process
 
 # Import sistema CrewAI
 from exam.assess import (
-    ExamAssessmentCrew,
-    load_checklist_tool,
-    load_exam_tool,
-    assess_feature_tool
+    ExamAssessmentCrew
 )
-from exam.llm_provider import get_llm_config
+from exam.llm_provider import get_llm
 
 
 class CrewAIExamClient:
@@ -25,20 +21,19 @@ class CrewAIExamClient:
     Sostituisce MCPClientDemo con sistema multi-agente.
     """
 
-    def __init__(self, model_name: str = "llama-3.3-70b-versatile"):
+    def __init__(self):
         """
         Inizializza il client CrewAI.
 
         Args:
             model_name: Modello LLM da usare
         """
-        self.llm_config = get_llm_config(model_name)
-        self.assessment_crew = ExamAssessmentCrew(model_name)
+        self.llm_config = get_llm()
+        self.assessment_crew = ExamAssessmentCrew()
 
         print(f"\n{'='*70}")
         print("CREWAI EXAM ASSESSMENT SYSTEM")
-        print(f"Model: {self.llm_config['model_name']}")
-        print(f"Provider: {self.llm_config['provider']}")
+        print(f"Model: {get_llm()}")
         print(f"{'='*70}\n")
 
     async def assess_single_student(

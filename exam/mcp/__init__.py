@@ -192,13 +192,12 @@ class ExamMCPServer:
 
         tools["load_exam_from_yaml"] = load_exam_from_yaml_tool
 
-        # TOOL: Assess Student Exam (REFACTORIZZATO)
+        # TOOL: Assess Student Exam
         async def assess_student_exam(student_email: str) -> str:
             """
             Assess all responses for a single student from loaded exam.
             Results are automatically saved to evaluations/{email}/assessment.json
 
-            REFACTORIZZATO: Ora la classe Assessor gestisce anche il salvataggio.
 
             Args:
                 student_email: Student's email (can use first 20 chars)
@@ -263,7 +262,7 @@ class ExamMCPServer:
                     questions_store=self.questions_store,
                     context=self.context,
                     save_results=True,
-                    original_grades=student_data.get("original_grades", {})  # ← AGGIUNTO!
+                    original_grades=student_data.get("original_grades", {})
                 )
 
                 # Aggiungi metadati Moodle (ancora gestito qui per ora)

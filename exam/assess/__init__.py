@@ -11,6 +11,7 @@ from crewai.tools import tool
 from pydantic import BaseModel, Field
 
 from exam import DIR_ROOT, get_questions_store
+from exam.llm_provider import get_llm
 from exam.solution import load_cache as load_answer_cache
 
 
@@ -172,7 +173,7 @@ def create_assessment_agents(llm_config: dict) -> tuple[Agent, Agent, Agent]:
         Your job is to load and organize exam data, ensuring all required information
         is available for the assessment team.""",
         tools=[load_checklist_tool, load_exam_tool],
-        llm=llm_config["llm"],
+        llm=llm_config,
         verbose=True,
         allow_delegation=False
     )
@@ -185,7 +186,7 @@ def create_assessment_agents(llm_config: dict) -> tuple[Agent, Agent, Agent]:
         You evaluate student answers by checking if core concepts and important details
         are present. You are thorough but fair, giving credit where due.""",
         tools=[assess_feature_tool],
-        llm=llm_config["llm"],
+        llm=llm_config,
         verbose=True,
         allow_delegation=False
     )
@@ -196,7 +197,7 @@ def create_assessment_agents(llm_config: dict) -> tuple[Agent, Agent, Agent]:
         goal="Generate clear, comprehensive reports of assessment results",
         backstory="""You are a reporting specialist who creates detailed summaries
         of exam assessments. You organize results clearly and highlight key statistics.""",
-        llm=llm_config["llm"],
+        llm=llm_config,
         verbose=True,
         allow_delegation=False
     )
@@ -292,10 +293,8 @@ class ExamAssessmentCrew:
     Sostituisce AgentExecutor e LangGraph orchestration.
     """
 
-    def __init__(self, model_name: str = "llama-3.3-70b-versatile"):
-        from exam.llm_provider import get_llm_config
-
-        self.llm_config = get_llm_config(model_name)
+    def __init__(self):
+        self.llm_config = get_llm()
         self.agents = create_assessment_agents(self.llm_config)
         self.evaluations_dir = DIR_ROOT / "evaluations"
         self.evaluations_dir.mkdir(parents=True, exist_ok=True)
@@ -375,7 +374,7 @@ class ExamAssessmentCrew:
             role="Assessment Manager",
             goal="Coordinate parallel assessment of multiple students",
             backstory="You manage a team of assessors to evaluate exams efficiently",
-            llm=self.llm_config["llm"],
+            llm=self.llm_config,
             verbose=True
         )
 
@@ -386,7 +385,7 @@ class ExamAssessmentCrew:
                 goal="Assess assigned student responses quickly and accurately",
                 backstory=f"You are worker #{i + 1} in the assessment team",
                 tools=[assess_feature_tool],
-                llm=self.llm_config["llm"],
+                llm=self.llm_config,
                 verbose=True
             )
             for i in range(num_workers)
@@ -408,7 +407,7 @@ class ExamAssessmentCrew:
             agents=[manager] + workers,
             tasks=[main_task],
             process=Process.hierarchical,
-            manager_llm=self.llm_config["llm"],
+            manager_llm=self.llm_config,
             verbose=True
         )
 

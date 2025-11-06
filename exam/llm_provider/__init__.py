@@ -44,7 +44,6 @@ def get_llm_config(model_name: str = "llama-3.3-70b-versatile"):
 
     ensure_groq_api_key()
 
-    # Crea l'istanza LLM per CrewAI
     llm = ChatGroq(
         model=model_name,
         groq_api_key=os.environ[KEY_GROQ_API_KEY],
@@ -61,7 +60,7 @@ def get_llm_config(model_name: str = "llama-3.3-70b-versatile"):
 
 def get_llm(model_name: str = "llama-3.3-70b-versatile"):
     """
-    Ottiene l'istanza LLM diretta (compatibilità con codice esistente).
+    Ottiene l'istanza LLM diretta.
     """
     config = get_llm_config(model_name)
     return config["llm"]
