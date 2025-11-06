@@ -10,9 +10,12 @@ from crewai import Agent, Task, Crew, Process
 from crewai.tools import tool
 from pydantic import BaseModel, Field
 
+# Import esistenti
 from exam import DIR_ROOT, get_questions_store
-from exam.llm_provider import get_llm
 from exam.solution import load_cache as load_answer_cache
+
+from exam.llm_provider import get_llm, get_llm_config
+# ============================================================================
 
 
 # ============================================================================
@@ -65,7 +68,7 @@ def load_exam_tool(questions_file: str, responses_file: str, grades_file: str = 
 
     Args:
         questions_file: Questions YAML filename
-        responses_file: Responses YAML filename  
+        responses_file: Responses YAML filename
         grades_file: Optional grades YAML filename
 
     Returns:
@@ -117,7 +120,6 @@ def assess_feature_tool(
     Returns:
         JSON with assessment result
     """
-    from exam.llm_provider import get_llm
 
     try:
         llm = get_llm()
@@ -173,12 +175,12 @@ def create_assessment_agents(llm_config: dict) -> tuple[Agent, Agent, Agent]:
         Your job is to load and organize exam data, ensuring all required information
         is available for the assessment team.""",
         tools=[load_checklist_tool, load_exam_tool],
-        llm=llm_config,
+        llm=llm_config["llm"],
         verbose=True,
         allow_delegation=False
     )
 
-    # AGENT 2: Answer Assessor  
+    # AGENT 2: Answer Assessor
     assessor_agent = Agent(
         role="Answer Assessor",
         goal="Evaluate student answers against assessment criteria with fairness and consistency",
@@ -186,7 +188,7 @@ def create_assessment_agents(llm_config: dict) -> tuple[Agent, Agent, Agent]:
         You evaluate student answers by checking if core concepts and important details
         are present. You are thorough but fair, giving credit where due.""",
         tools=[assess_feature_tool],
-        llm=llm_config,
+        llm=llm_config["llm"],
         verbose=True,
         allow_delegation=False
     )
@@ -197,7 +199,7 @@ def create_assessment_agents(llm_config: dict) -> tuple[Agent, Agent, Agent]:
         goal="Generate clear, comprehensive reports of assessment results",
         backstory="""You are a reporting specialist who creates detailed summaries
         of exam assessments. You organize results clearly and highlight key statistics.""",
-        llm=llm_config,
+        llm=llm_config["llm"],
         verbose=True,
         allow_delegation=False
     )
@@ -293,8 +295,9 @@ class ExamAssessmentCrew:
     Sostituisce AgentExecutor e LangGraph orchestration.
     """
 
-    def __init__(self):
-        self.llm_config = get_llm()
+    def __init__(self, model_name: str = "llama-3.3-70b-versatile"):
+
+        self.llm_config = get_llm_config(model_name)
         self.agents = create_assessment_agents(self.llm_config)
         self.evaluations_dir = DIR_ROOT / "evaluations"
         self.evaluations_dir.mkdir(parents=True, exist_ok=True)
@@ -374,7 +377,7 @@ class ExamAssessmentCrew:
             role="Assessment Manager",
             goal="Coordinate parallel assessment of multiple students",
             backstory="You manage a team of assessors to evaluate exams efficiently",
-            llm=self.llm_config,
+            llm=self.llm_config["llm"],
             verbose=True
         )
 
@@ -385,7 +388,7 @@ class ExamAssessmentCrew:
                 goal="Assess assigned student responses quickly and accurately",
                 backstory=f"You are worker #{i + 1} in the assessment team",
                 tools=[assess_feature_tool],
-                llm=self.llm_config,
+                llm=self.llm_config["llm"],
                 verbose=True
             )
             for i in range(num_workers)
@@ -407,8 +410,8 @@ class ExamAssessmentCrew:
             agents=[manager] + workers,
             tasks=[main_task],
             process=Process.hierarchical,
-            manager_llm=self.llm_config,
-            verbose=True
+            manager_llm=self.llm_config["llm"],
+            verbose=True # Corretto da '2' a 'True'
         )
 
         result = crew.kickoff()
@@ -447,7 +450,7 @@ async def assess_student_exam(
     # Formatta risultato in formato compatibile
     return {
         "student_email": student_email,
-        "calculated_score": 0.0,
+        "calculated_score": 0.0,  # TODO: parse from result
         "max_score": sum(q["score"] for q in exam_questions),
         "percentage": 0.0,
         "scoring_system": "70% Core + 30% Important_Details",

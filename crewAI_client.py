@@ -33,7 +33,7 @@ class CrewAIExamClient:
 
         print(f"\n{'='*70}")
         print("CREWAI EXAM ASSESSMENT SYSTEM")
-        print(f"Model: {get_llm()}")
+        print(f"Model: {self.llm_config.model_name}")
         print(f"{'='*70}\n")
 
     async def assess_single_student(
