@@ -4,9 +4,8 @@ mcp>=1.0.0
 # CrewAI - Multi-agent orchestration
 crewai>=0.28.0
 crewai-tools>=0.4.0
-
+litellm
 # LLM providers for CrewAI
-langchain-groq>=0.1.0
 
 # HuggingFace for embeddings
 sentence-transformers>=2.2.0

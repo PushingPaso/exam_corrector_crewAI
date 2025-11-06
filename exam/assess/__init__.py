@@ -31,34 +31,64 @@ class FeatureAssessment(BaseModel):
 # CREWAI TOOLS (ex LangChain tools)
 # ============================================================================
 
-@tool("Load Checklist")
-def load_checklist_tool(question_id: str) -> str:
+@tool("Load Checklists") # Potresti rinominarlo al plurale, es. "Load Checklists"
+def load_checklist_tool(question_id: list[str]) -> str:
     """
-    Load the assessment checklist for a question.
+    Carica le checklist di valutazione per una lista di domande.
 
     Args:
-        question_id: The question ID (e.g., "CI-5")
+        question_id: Una lista di ID di domande (es. ["CI-5", "CI-6"])
 
     Returns:
-        JSON string with checklist details
+        Stringa JSON contenente una lista di dettagli delle checklist
+        o errori per ciascun ID.
     """
+    results = []  # Lista per contenere il risultato di ogni ID
+
     try:
+        # Ottieni lo store solo una volta, all'inizio
         questions_store = get_questions_store()
-        question = questions_store.question(question_id)
-        checklist = load_answer_cache(question)
 
-        if not checklist:
-            return json.dumps({"error": f"No checklist found for {question_id}"})
+        # Itera su ogni ID di domanda fornito nella lista
+        for q_id in question_id:
+            try:
+                # Prova a recuperare la singola domanda e checklist
+                question = questions_store.question(q_id)
+                checklist = load_answer_cache(question)
 
-        return json.dumps({
-            "status": "success",
-            "question_id": question_id,
-            "question_text": question.text,
-            "core_items": checklist.core,
-            "important_items": checklist.details_important,
-        })
+                if not checklist:
+                    # Se non c'è checklist, aggiungi un errore per questo ID
+                    results.append({
+                        "status": "error",
+                        "question_id": q_id,
+                        "error": f"No checklist found for {q_id}"
+                    })
+                else:
+                    # Se ha successo, aggiungi i dati
+                    results.append({
+                        "status": "success",
+                        "question_id": q_id,
+                        "question_text": question.text,
+                        "core_items": checklist.core,
+                        "important_items": checklist.details_important,
+                    })
+            except Exception as e:
+                # Gestisce errori per un ID specifico (es. ID non trovato)
+                results.append({
+                    "status": "error",
+                    "question_id": q_id,
+                    "error": str(e)
+                })
+
+        # Converte l'intera lista di risultati in una singola stringa JSON
+        return json.dumps(results)
+
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        # Gestisce un errore catastrofico (es. non può connettersi a questions_store)
+        return json.dumps({
+            "status": "critical_error",
+            "error": f"An unexpected error occurred during initialization: {str(e)}"
+        })
 
 
 @tool("Load Exam from YAML")
@@ -106,7 +136,7 @@ def assess_feature_tool(
         question_text: str,
         feature_description: str,
         feature_type: str,
-        student_response: str
+        student_response: str,
 ) -> str:
     """
     Assess a single feature in a student's answer.
@@ -118,7 +148,7 @@ def assess_feature_tool(
             role="Feature Assessor",
             goal="Assess if feature is present",
             backstory="You are an expert at evaluating student answers",
-            llm="groq/llama-3.3-70b-versatile",  # ✅ Stringa!
+            llm=get_llm(),
             verbose=False
         )
 
@@ -288,7 +318,6 @@ def create_assessment_tasks(
 class ExamAssessmentCrew:
     """
     Crew principale per la valutazione esami.
-    Sostituisce AgentExecutor e LangGraph orchestration.
     """
 
     def __init__(self):
@@ -302,7 +331,7 @@ class ExamAssessmentCrew:
             self,
             exam_date: str,
             student_email: str = None,
-            process_type: Process = Process.sequential
+            process_type: Process = Process.sequential,
     ) -> dict:
         """
         Valuta un esame completo.
@@ -407,7 +436,7 @@ class ExamAssessmentCrew:
             tasks=[main_task],
             process=Process.hierarchical,
             manager_llm=self.llm_config,
-            verbose=True # Corretto da '2' a 'True'
+            verbose=True
         )
 
         result = crew.kickoff()

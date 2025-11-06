@@ -8,11 +8,9 @@ import os
 
 from crewai import Agent, Task, Crew, Process
 
-# Import sistema CrewAI
 from exam.assess import (
     ExamAssessmentCrew
 )
-from exam.llm_provider import get_llm
 
 
 class CrewAIExamClient:
@@ -28,7 +26,6 @@ class CrewAIExamClient:
         Args:
             model_name: Modello LLM da usare
         """
-        self.llm_config = get_llm()
         self.assessment_crew = ExamAssessmentCrew()
 
         print(f"\n{'='*70}")
