@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from exam import DIR_ROOT, get_questions_store
 from exam.solution import load_cache as load_answer_cache
 
-from exam.llm_provider import get_llm, get_llm_config
+from exam.llm_provider import get_llm
 # ============================================================================
 
 
@@ -110,46 +110,42 @@ def assess_feature_tool(
 ) -> str:
     """
     Assess a single feature in a student's answer.
-
-    Args:
-        question_text: The question text
-        feature_description: What to check for
-        feature_type: "core" or "important detail"
-        student_response: Student's answer
-
-    Returns:
-        JSON with assessment result
     """
-
     try:
-        llm = get_llm()
 
-        # Crea il prompt
-        prompt = f"""You are a teacher evaluating a student's answer.
+        # Crea agent temporaneo per assessment
+        agent = Agent(
+            role="Feature Assessor",
+            goal="Assess if feature is present",
+            backstory="You are an expert at evaluating student answers",
+            llm="groq/llama-3.3-70b-versatile",  # ✅ Stringa!
+            verbose=False
+        )
+
+        # Crea task
+        task = Task(
+            description=f"""Assess this feature in the student's answer.
 
 Question: {question_text}
-
-Feature to check ({feature_type}): {feature_description}
-
+Feature ({feature_type}): {feature_description}
 Student's answer: {student_response}
 
-Determine if this feature is present and explain why.
-Return JSON with 'satisfied' (bool) and 'motivation' (string)."""
+Is the feature present? Explain why.
+Return JSON: {{"satisfied": true/false, "motivation": "explanation"}}""",
+            expected_output="JSON with satisfied and motivation",
+            agent=agent
+        )
 
-        # Invoca il modello con structured output
-        from langchain_core.output_parsers import PydanticOutputParser
-        parser = PydanticOutputParser(pydantic_object=FeatureAssessment)
+        # Esegui
+        crew = Crew(agents=[agent], tasks=[task])
+        result = crew.kickoff()
 
-        prompt_with_format = prompt + f"\n\n{parser.get_format_instructions()}"
-        result = llm.invoke(prompt_with_format)
-
-        # Parse il risultato
-        assessment = parser.parse(result.content)
-
-        return json.dumps({
-            "satisfied": assessment.satisfied,
-            "motivation": assessment.motivation
-        })
+        # Parse result (è già stringa JSON o quasi)
+        import json
+        try:
+            return result if isinstance(result, str) else json.dumps(result)
+        except:
+            return json.dumps({"satisfied": False, "motivation": str(result)})
 
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -175,7 +171,7 @@ def create_assessment_agents(llm_config: dict) -> tuple[Agent, Agent, Agent]:
         Your job is to load and organize exam data, ensuring all required information
         is available for the assessment team.""",
         tools=[load_checklist_tool, load_exam_tool],
-        llm=llm_config["llm"],
+        llm=llm_config,
         verbose=True,
         allow_delegation=False
     )
@@ -188,7 +184,7 @@ def create_assessment_agents(llm_config: dict) -> tuple[Agent, Agent, Agent]:
         You evaluate student answers by checking if core concepts and important details
         are present. You are thorough but fair, giving credit where due.""",
         tools=[assess_feature_tool],
-        llm=llm_config["llm"],
+        llm=llm_config,
         verbose=True,
         allow_delegation=False
     )
@@ -199,7 +195,7 @@ def create_assessment_agents(llm_config: dict) -> tuple[Agent, Agent, Agent]:
         goal="Generate clear, comprehensive reports of assessment results",
         backstory="""You are a reporting specialist who creates detailed summaries
         of exam assessments. You organize results clearly and highlight key statistics.""",
-        llm=llm_config["llm"],
+        llm=llm_config,
         verbose=True,
         allow_delegation=False
     )
@@ -295,9 +291,9 @@ class ExamAssessmentCrew:
     Sostituisce AgentExecutor e LangGraph orchestration.
     """
 
-    def __init__(self, model_name: str = "llama-3.3-70b-versatile"):
+    def __init__(self):
 
-        self.llm_config = get_llm_config(model_name)
+        self.llm_config = get_llm()
         self.agents = create_assessment_agents(self.llm_config)
         self.evaluations_dir = DIR_ROOT / "evaluations"
         self.evaluations_dir.mkdir(parents=True, exist_ok=True)
@@ -377,7 +373,7 @@ class ExamAssessmentCrew:
             role="Assessment Manager",
             goal="Coordinate parallel assessment of multiple students",
             backstory="You manage a team of assessors to evaluate exams efficiently",
-            llm=self.llm_config["llm"],
+            llm=self.llm_config,
             verbose=True
         )
 
@@ -388,7 +384,7 @@ class ExamAssessmentCrew:
                 goal="Assess assigned student responses quickly and accurately",
                 backstory=f"You are worker #{i + 1} in the assessment team",
                 tools=[assess_feature_tool],
-                llm=self.llm_config["llm"],
+                llm=self.llm_config,
                 verbose=True
             )
             for i in range(num_workers)
@@ -410,7 +406,7 @@ class ExamAssessmentCrew:
             agents=[manager] + workers,
             tasks=[main_task],
             process=Process.hierarchical,
-            manager_llm=self.llm_config["llm"],
+            manager_llm=self.llm_config,
             verbose=True # Corretto da '2' a 'True'
         )
 
