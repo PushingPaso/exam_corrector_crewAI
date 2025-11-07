@@ -34,9 +34,10 @@ def get_llm(model_name: str = "llama-3.3-70b-versatile") -> LLM:
     model_configs = {
         "llama-3.3": "llama-3.3-70b-versatile",
         "llama-8b": "llama-3.1-8b-instant",
+        "llama-inf":"meta-llama/llama-4-scout-17b-16e-instruct"
     }
     llm = LLM(
-        model = "groq/meta-llama/llama-4-scout-17b-16e-instruct",
+        model = "groq/llama-3.3-70b-versatile",
         temperature=0.1
     )
 

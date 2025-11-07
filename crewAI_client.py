@@ -9,10 +9,9 @@ import os
 from crewai import Agent, Task, Crew, Process
 
 from exam import DIR_ROOT
-from exam.assess import (
-    create_assessment_agents, assess_feature_tool
-)
+from exam.agents import createAgents, getWorkerAgents
 from exam.llm_provider import get_llm
+from exam.tasks import create_assessment_tasks
 
 
 class CrewAIExamClient:
@@ -23,12 +22,12 @@ class CrewAIExamClient:
     def __init__(self):
 
         self.llm_config = get_llm()
-        self.agents = create_assessment_agents(self.llm_config)
+        self.agents = createAgents(self.llm_config)
         self.evaluations_dir = DIR_ROOT / "evaluations"
         self.evaluations_dir.mkdir(parents=True, exist_ok=True)
 
 
-    async def single_student(self):
+    async def single_student(self, exam_date:str):
         pass
 
 
@@ -37,63 +36,15 @@ class CrewAIExamClient:
             exam_date: str,
             num_workers: int = 3
     ) -> dict:
-        """
-        Valuta esame con workers paralleli.
-        In CrewAI, usiamo Process.hierarchical per parallelismo.
 
-        Args:
-            exam_date: Data esame
-            num_workers: Numero di worker paralleli
-
-        Returns:
-            Risultati aggregati
-        """
         print(f"\n{'=' * 70}")
         print(f"PARALLEL ASSESSMENT with {num_workers} workers")
         print(f"{'=' * 70}\n")
 
-        # In CrewAI, il parallelismo è gestito con Process.hierarchical
-        # e un manager agent che delega ai worker
-
-        # Crea manager agent
-        manager = Agent(
-            role="Assessment Manager",
-            goal="Coordinate parallel assessment of multiple students",
-            backstory="You manage a team of assessors to evaluate exams efficiently",
-            llm=self.llm_config,
-            verbose=True
-        )
-
-        # Crea worker agents
-        workers = [
-            Agent(
-                role=f"Assessment Worker {i + 1}",
-                goal="Assess assigned student responses quickly and accurately",
-                backstory=f"You are worker #{i + 1} in the assessment team",
-                tools=[assess_feature_tool],
-                llm=self.llm_config,
-                verbose=True
-            )
-            for i in range(num_workers)
-        ]
-
-        # Crea task principale
-        main_task = Task(
-            description=f"""Assess all students in exam {exam_date}.
-
-            Delegate work evenly among your {num_workers} workers.
-            Each worker should assess approximately the same number of students.
-            Collect and aggregate results.""",
-            expected_output="Aggregated assessment results for all students",
-            agent=manager
-        )
-
-        # Crea crew gerarchico
         crew = Crew(
-            agents=[manager] + workers,
-            tasks=[main_task],
-            process=Process.hierarchical,
-            manager_llm=self.llm_config,
+            agents=self.agents,
+            tasks=create_assessment_tasks(self.agents,exam_date),
+            llm=self.llm_config,
             verbose=True
         )
 
@@ -119,7 +70,7 @@ async def main():
         return
 
     print("\n" + "="*70)
-    print("🤖 CREWAI EXAM ASSESSMENT SYSTEM")
+    print(" CREWAI EXAM ASSESSMENT SYSTEM")
     print("="*70)
     print("\nThis system uses CrewAI multi-agent orchestration to:")
     print("  ✓ Load exam data and checklists")
@@ -135,11 +86,12 @@ async def main():
 
     client = CrewAIExamClient()
     choice = input("\nChoice (1-5): ").strip()
+    exam_date = input("\n📅 Enter exam date (format: YYYY-MM-DD, e.g., 2024-01-15): ").strip()
 
     if choice == "1":
-        await client.single_student()
+        await client.single_student(exam_date)
     elif choice == "2":
-        await client.full_exam()
+        await client.full_exam(exam_date)
 
 
     print("\n✅ All done!")

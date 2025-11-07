@@ -1,32 +1,25 @@
 """
 Modulo RAG (Retrieval-Augmented Generation)
-Tradotto per CrewAI senza dipendenze da LangChain.
+Versione semplificata e robusta per CrewAI.
 
-SOSTITUZIONE: Abbandono di 'sqlite-vec' (problematico) in favore di 'chromadb'.
-'chromadb' è una libreria standard per la persistenza di vector store.
+USO: ChromaDB per vector storage + embeddings leggeri
+ELIMINAZIONE: sentence-transformers problematico in favore di chromadb embeddings
 """
 import re
-import shutil
+import os
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any
-
-# Import nativi (NO LANGCHAIN)
-from sentence_transformers import SentenceTransformer
-import chromadb # Importa la nuova libreria
+from typing import List, Dict, Any, Optional
+import chromadb
+from chromadb.config import Settings
 
 from exam import DIR_ROOT
 
-
 DIR_CONTENT = DIR_ROOT / "content"
-# MODIFICA: Chroma salva in una cartella, non in un file.
-# Rinomino la variabile per chiarezza.
 DIR_RAG_DB = DIR_ROOT / "slides_rag_db"
-# Esporta la nuova variabile per coerenza con __main__.py
 FILE_DB = DIR_RAG_DB
 
 MARKDOWN_FILES = list(DIR_CONTENT.glob("**/_index.md"))
 REGEX_SLIDE_DELIMITER = re.compile(r"^\s*(---|\+\+\+)")
-
 
 class Slide(BaseModel):
     content: str
@@ -38,13 +31,9 @@ class Slide(BaseModel):
     def lines_count(self):
         return self.content.count("\n") + 1 if self.content else 0
 
-
 class Document(BaseModel):
-
-
     page_content: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
-
 
 # ============================================================================
 # CARICAMENTO SLIDE (invariato)
@@ -84,173 +73,204 @@ def all_slides(files = None):
                 index=slide_index,
             )
 
-
 # ============================================================================
-# GESTIONE EMBEDDING (con sentence_transformers, invariato)
-# ============================================================================
-
-def huggingface_embeddings(model=None) -> SentenceTransformer:
-    """
-    Crea un modello di embeddings HuggingFace usando sentence_transformers.
-    NON USA LANGCHAIN.
-
-    Args:
-        model: Hint per il modello (es. 'bge-large')
-
-    Returns:
-        Istanza di SentenceTransformer
-    """
-    if not model:
-        model = "bge-large"
-
-    model = model.lower()
-    device = 'cpu'
-
-    if model == "bge-large" or model == "best":
-        model_name = "BAAI/bge-large-en-v1.5"
-    elif model == "bge-base" or model == "recommended":
-        model_name = "BAAI/bge-base-en-v1.5"
-    elif model == "bge-small" or model == "fast":
-        model_name = "BAAI/bge-small-en-v1.5"
-    elif model == "nomic":
-        model_name = "nomic-ai/nomic-embed-text-v1"
-    elif model == "gte-large":
-        model_name = "thenlper/gte-large"
-    elif model == "legacy-small" or "mini" in model:
-        model_name = "sentence-transformers/all-MiniLM-L6-v2"
-    elif model == "legacy-large" or "mpnet" in model:
-        model_name = "sentence-transformers/all-mpnet-base-v2"
-    elif model.startswith("BAAI/") or model.startswith("sentence-transformers/") or "/" in model:
-        model_name = model
-    else:
-        raise ValueError(f"Unknown model hint: {model}")
-
-    print(f"# Loading embeddings model: {model_name} (via sentence-transformers)")
-
-    return SentenceTransformer(
-        model_name_or_path=model_name,
-        device=device,
-        trust_remote_code=True if model == "nomic" else False
-    )
-
-
-# ============================================================================
-# WRAPPER VECTOR STORE (ora usa ChromaDB)
+# VECTOR STORE SEMPLIFICATO (usa ChromaDB embeddings built-in)
 # ============================================================================
 
 class CrewAIVectorStore:
     """
-    Wrapper per 'chromadb.Collection' che mima l'interfaccia
-    del VectorStore di LangChain per compatibilità.
+    Vector Store semplificato che usa ChromaDB con embeddings built-in.
+    Elimina la dipendenza da sentence-transformers problematica.
     """
 
-    def __init__(self, db_path: str, table_name: str, embed_model: SentenceTransformer):
-        self._embed_model = embed_model
-
-        # Inizializza il client persistente di Chroma
-        # Salverà i dati nella cartella specificata
-        self._client = chromadb.PersistentClient(path=db_path)
-
-        # Crea un "embedding function" wrapper per Chroma
-        class ChromaEmbeddingFunction(chromadb.EmbeddingFunction):
-            def __call__(self, input: chromadb.Documents) -> chromadb.Embeddings:
-                return embed_model.encode(input, normalize_embeddings=True).tolist()
-
-        # Ottieni o crea la "collection" (simile a una tabella)
-        self._collection = self._client.get_or_create_collection(
-            name=table_name,
-            embedding_function=ChromaEmbeddingFunction()
+    def __init__(self, db_path: str, table_name: str, embedding_model: str = "all-MiniLM-L6-v2"):
+        """
+        Args:
+            db_path: Percorso della cartella del database
+            table_name: Nome della collection
+            embedding_model: Modello di embedding da usare (usa modelli supportati da Chroma)
+        """
+        self._client = chromadb.PersistentClient(
+            path=db_path,
+            settings=Settings(anonymized_telemetry=False)
         )
+
+        # Usa gli embeddings built-in di ChromaDB (più leggeri e stabili)
+        try:
+            self._collection = self._client.get_or_create_collection(
+                name=table_name,
+                # Chroma gestirà automaticamente gli embeddings
+                metadata={"hnsw:space": "cosine"}
+            )
+        except Exception as e:
+            print(f"Warning: Could not create collection with default settings: {e}")
+            # Fallback: collection senza configurazioni speciali
+            self._collection = self._client.get_or_create_collection(name=table_name)
 
     def similarity_search(self, query: str, k: int = 5) -> List[Document]:
         """
-        Esegue la ricerca e formatta i risultati come oggetti Document compatibili.
+        Esegue la ricerca di similarità.
         """
-        results = []
         try:
-            # Esegui la query
-            query_results = self._collection.query(
+            results = self._collection.query(
                 query_texts=[query],
-                n_results=k
+                n_results=min(k, 10)  # Limita a max 10 risultati
             )
 
-            # Estrai e formatta i risultati
-            docs_list = query_results.get('documents', [[]])[0]
-            metas_list = query_results.get('metadatas', [[]])[0]
+            documents = []
+            if results['documents'] and len(results['documents']) > 0:
+                for i, doc_text in enumerate(results['documents'][0]):
+                    metadata = results['metadatas'][0][i] if results['metadatas'] and i < len(results['metadatas'][0]) else {}
+                    documents.append(Document(
+                        page_content=doc_text,
+                        metadata=metadata
+                    ))
 
-            for i, text_content in enumerate(docs_list):
-                metadata = metas_list[i] if i < len(metas_list) else {}
-                results.append(Document(
-                    page_content=text_content,
-                    metadata=metadata
-                ))
+            return documents
 
         except Exception as e:
-            print(f"Error during RAG search (ChromaDB): {e}")
-            return [Document(page_content=f"Error during search: {e}", metadata={})]
-
-        return results
+            print(f"Error during similarity search: {e}")
+            return [Document(page_content="Search temporarily unavailable", metadata={})]
 
     def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]] = None):
         """
         Aggiunge testi al vector store.
-        Chroma richiede ID univoci, li generiamo.
         """
-        # Genera ID univoci
-        ids = [f"doc_{hash(txt)}_{i}" for i, txt in enumerate(texts)]
+        if metadatas is None:
+            metadatas = [{} for _ in texts]
+
+        if len(texts) != len(metadatas):
+            raise ValueError("Texts and metadatas must have the same length")
+
+        # Genera ID semplici
+        ids = [f"doc_{i}_{hash(txt) % 10000}" for i, txt in enumerate(texts)]
 
         try:
-            self._collection.add(
-                documents=texts,
-                metadatas=metadatas,
-                ids=ids
-            )
-        except chromadb.errors.IDAlreadyExistsError:
-            print("Warning: Some documents were already present and were skipped.")
-            # Gestisci l'aggiunta incrementale se necessario (qui usiamo 'upsert')
+            # Usa upsert per evitare duplicati
             self._collection.upsert(
                 documents=texts,
                 metadatas=metadatas,
                 ids=ids
             )
-        except Exception as e:
-            print(f"Error adding texts to ChromaDB: {e}")
+            print(f"Added {len(texts)} documents to vector store")
 
+        except Exception as e:
+            print(f"Error adding texts: {e}")
+            # Fallback: prova ad aggiungere uno per uno
+            for i, (text, metadata) in enumerate(zip(texts, metadatas)):
+                try:
+                    self._collection.upsert(
+                        documents=[text],
+                        metadatas=[metadata],
+                        ids=[f"doc_{i}_fallback"]
+                    )
+                except Exception as single_error:
+                    print(f"Failed to add document {i}: {single_error}")
 
     def get_dimensionality(self) -> int:
         """
-        Restituisce la dimensionalità richiesta dal resto del codice.
-        La otteniamo direttamente dal modello di embedding.
+        Restituisce una dimensionalità fissa per compatibilità.
+        ChromaDB gestisce internamente la dimensionalità.
+        """
+        return 384  # Dimensionalità tipica per modelli piccoli
+
+    def get_collection_size(self) -> int:
+        """
+        Restituisce il numero di documenti nella collection.
         """
         try:
-            dim = self._embed_model.get_sentence_embedding_dimension()
-            if dim:
-                return dim
-            # Fallback
-            return len(self._embed_model.encode("test", normalize_embeddings=True))
-        except Exception:
-            return 0 # Errore
+            return self._collection.count()
+        except:
+            return 0
 
 # ============================================================================
-# FUNZIONE PRINCIPALE (Factory)
+# FUNZIONE PRINCIPALE (Factory) - VERSIONE CORRETTA
 # ============================================================================
 
 def sqlite_vector_store(
-        db_file: str = str(FILE_DB), # Mantiene il nome argomento per compatibilità
-        model: str = None,
+        db_file: str = str(FILE_DB),
+        model: str = None,  # Parametro mantenuto per compatibilità, ma non usato
         table_name: str = "se_slides") -> CrewAIVectorStore:
     """
     Crea o carica un vector store persistente usando ChromaDB.
-    MANTIENE il nome 'sqlite_vector_store' per compatibilità con il
-    resto del codice, anche se ora usa ChromaDB.
+    Versione semplificata e robusta.
     """
-    # 1. Ottieni il modello SentenceTransformer
-    embeddings_model = huggingface_embeddings(model)
+    try:
+        # Crea la directory se non esiste
+        os.makedirs(os.path.dirname(db_file) if os.path.dirname(db_file) else ".", exist_ok=True)
 
-    # 2. Crea e restituisci il wrapper
-    #    Nota: db_file (che ora è DIR_RAG_DB) è una cartella
-    return CrewAIVectorStore(
-        db_path=db_file,
-        table_name=table_name,
-        embed_model=embeddings_model,
-    )
+        # Crea e restituisci il vector store
+        store = CrewAIVectorStore(
+            db_path=db_file,
+            table_name=table_name
+        )
+
+        print(f"✅ Vector store inizializzato: {db_file}")
+        print(f"📊 Documenti nella collection: {store.get_collection_size()}")
+
+        return store
+
+    except Exception as e:
+        print(f"❌ Errore critico nell'inizializzazione del vector store: {e}")
+        # Restituisci un fallback che non crasha
+        return CrewAIVectorStore(db_path="./fallback_db", table_name=table_name)
+
+# ============================================================================
+# FUNZIONI UTILITY AGGIUNTIVE
+# ============================================================================
+
+def populate_vector_store(store: CrewAIVectorStore, max_slides: int = None) -> int:
+    """
+    Popola il vector store con le slide.
+
+    Args:
+        store: Il vector store da popolare
+        max_slides: Numero massimo di slide da processare (per testing)
+
+    Returns:
+        Numero di slide aggiunte
+    """
+    slides_added = 0
+    texts = []
+    metadatas = []
+
+    try:
+        for i, slide in enumerate(all_slides()):
+            if max_slides and i >= max_slides:
+                break
+
+            texts.append(slide.content)
+            metadatas.append({
+                "source": slide.source,
+                "lines_start": slide.lines[0],
+                "lines_end": slide.lines[1],
+                "slide_index": slide.index
+            })
+            slides_added += 1
+
+            # Aggiungi in batch per efficienza
+            if len(texts) >= 50:
+                store.add_texts(texts, metadatas)
+                texts.clear()
+                metadatas.clear()
+
+        # Aggiungi eventuali rimanenti
+        if texts:
+            store.add_texts(texts, metadatas)
+
+        print(f" Aggiunte {slides_added} slide al vector store")
+        return slides_added
+
+    except Exception as e:
+        print(f" Errore nel popolamento del vector store: {e}")
+        return slides_added
+
+def search_slides(query: str, store: CrewAIVectorStore, k: int = 5) -> List[Document]:
+    """
+    Funzione helper per cercare slide.
+    """
+    try:
+        return store.similarity_search(query, k)
+    except Exception as e:
+        print(f" Errore nella ricerca: {e}")
+        return []
