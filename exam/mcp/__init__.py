@@ -7,9 +7,11 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict
-
+from crewai import Tools
 from exam import get_questions_store, load_exam_from_yaml
 from exam.solution import Answer, load_cache as load_answer_cache
+from exam import DIR_ROOT
+
 
 
 @dataclass
@@ -62,28 +64,23 @@ class ExamMCPServer:
     MCP Server con context condiviso per collaborazione tra tool.
     REFACTORIZZATO: Ora è solo un layer di orchestrazione.
     """
-
     def __init__(self):
         self.questions_store = get_questions_store()
         self.context = AssessmentContext()
         self.context.loaded_exams = {}  # For batch exam processing
 
-        from exam import DIR_ROOT
         self.evaluations_dir = DIR_ROOT / "evaluations"
         self.evaluations_dir.mkdir(parents=True, exist_ok=True)
 
-        # Directory for YAML exam files
+            # Directory for YAML exam files
         self.exams_dir = DIR_ROOT / "static" / "se-exams"
         self.exams_dir.mkdir(parents=True, exist_ok=True)
 
-        self.tools = self._create_tools()
 
-    def _create_tools(self):
-        """Create all available tools."""
-        tools = {}
-
+    """Create all available tools."""
+    @Tools
         # TOOL: Load Checklist (ATOMICO)
-        async def load_checklist(question_id: str) -> str:
+    async def load_checklist(self,question_id: str) -> str:
             """
             Load the assessment checklist for a question into memory.
             The checklist will be available for other tools to use.
@@ -129,10 +126,10 @@ class ExamMCPServer:
             except Exception as e:
                 return json.dumps({"error": str(e)})
 
-        tools["load_checklist"] = load_checklist
+    @Tools
 
         # TOOL: Load Exam from YAML (REFACTORIZZATO)
-        async def load_exam_from_yaml_tool(questions_file: str, responses_file: str, grades_file: str = None) -> str:
+    async def load_exam_from_yaml_tool(self, questions_file: str, responses_file: str, grades_file: str = None) -> str:
             """
             Load an entire exam from YAML files in static/se-exams directory.
 
@@ -190,10 +187,10 @@ class ExamMCPServer:
                 import traceback
                 return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
-        tools["load_exam_from_yaml"] = load_exam_from_yaml_tool
+    @Tools
 
         # TOOL: Assess Student Exam
-        async def assess_student_exam(student_email: str) -> str:
+    async def assess_student_exam(self, student_email: str) -> str:
             """
             Assess all responses for a single student from loaded exam.
             Results are automatically saved to evaluations/{email}/assessment.json
@@ -274,6 +271,3 @@ class ExamMCPServer:
                 import traceback
                 return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
-        tools["assess_student_exam"] = assess_student_exam
-
-        return tools

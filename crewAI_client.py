@@ -8,9 +8,11 @@ import os
 
 from crewai import Agent, Task, Crew, Process
 
+from exam import DIR_ROOT
 from exam.assess import (
-    ExamAssessmentCrew
+    create_assessment_agents, assess_feature_tool
 )
+from exam.llm_provider import get_llm
 
 
 class CrewAIExamClient:
@@ -18,163 +20,91 @@ class CrewAIExamClient:
     Client principale basato su CrewAI.
     Sostituisce MCPClientDemo con sistema multi-agente.
     """
-
     def __init__(self):
-        """
-        Inizializza il client CrewAI.
 
-        Args:
-            model_name: Modello LLM da usare
-        """
-        self.assessment_crew = ExamAssessmentCrew()
+        self.llm_config = get_llm()
+        self.agents = create_assessment_agents(self.llm_config)
+        self.evaluations_dir = DIR_ROOT / "evaluations"
+        self.evaluations_dir.mkdir(parents=True, exist_ok=True)
 
-        print(f"\n{'='*70}")
-        print("CREWAI EXAM ASSESSMENT SYSTEM")
-        print(f"{'='*70}\n")
 
-    async def assess_single_student(
-        self,
-        exam_date: str,
-        student_email: str
+    async def single_student(self):
+        pass
+
+
+    async def full_exam(
+            self,
+            exam_date: str,
+            num_workers: int = 3
     ) -> dict:
         """
-        Valuta un singolo studente.
+        Valuta esame con workers paralleli.
+        In CrewAI, usiamo Process.hierarchical per parallelismo.
 
         Args:
-            exam_date: Data esame (YYYY-MM-DD)
-            student_email: Email dello studente
+            exam_date: Data esame
+            num_workers: Numero di worker paralleli
 
         Returns:
-            Risultati valutazione
+            Risultati aggregati
         """
-        print(f"\n📝 Assessing student: {student_email[:40]}...")
+        print(f"\n{'=' * 70}")
+        print(f"PARALLEL ASSESSMENT with {num_workers} workers")
+        print(f"{'=' * 70}\n")
 
-        result = self.assessment_crew.assess_exam(
-            exam_date=exam_date,
-            student_email=student_email,
-            process_type=Process.sequential
+        # In CrewAI, il parallelismo è gestito con Process.hierarchical
+        # e un manager agent che delega ai worker
+
+        # Crea manager agent
+        manager = Agent(
+            role="Assessment Manager",
+            goal="Coordinate parallel assessment of multiple students",
+            backstory="You manage a team of assessors to evaluate exams efficiently",
+            llm=self.llm_config,
+            verbose=True
         )
 
-        return result
-
-    async def assess_full_exam(
-        self,
-        exam_date: str,
-        parallel: bool = False,
-        num_workers: int = 3
-    ) -> dict:
-        """
-        Valuta un esame completo.
-
-        Args:
-            exam_date: Data esame (YYYY-MM-DD)
-            parallel: Se True, usa workers paralleli
-            num_workers: Numero di workers (solo se parallel=True)
-
-        Returns:
-            Risultati valutazione
-        """
-        print(f"\n📚 Assessing full exam: {exam_date}")
-
-        if parallel:
-            print(f"⚡ Using {num_workers} parallel workers")
-            result = self.assessment_crew.assess_exam_parallel(
-                exam_date=exam_date,
-                num_workers=num_workers
+        # Crea worker agents
+        workers = [
+            Agent(
+                role=f"Assessment Worker {i + 1}",
+                goal="Assess assigned student responses quickly and accurately",
+                backstory=f"You are worker #{i + 1} in the assessment team",
+                tools=[assess_feature_tool],
+                llm=self.llm_config,
+                verbose=True
             )
-        else:
-            print("📝 Sequential processing")
-            result = self.assessment_crew.assess_exam(
-                exam_date=exam_date,
-                student_email=None,
-                process_type=Process.sequential
-            )
+            for i in range(num_workers)
+        ]
 
-        return result
+        # Crea task principale
+        main_task = Task(
+            description=f"""Assess all students in exam {exam_date}.
 
-    async def interactive_assessment(self):
-        """
-        Modalità interattiva per valutazione esami.
-        """
-        print("\n" + "="*70)
-        print("INTERACTIVE EXAM ASSESSMENT")
-        print("="*70)
+            Delegate work evenly among your {num_workers} workers.
+            Each worker should assess approximately the same number of students.
+            Collect and aggregate results.""",
+            expected_output="Aggregated assessment results for all students",
+            agent=manager
+        )
 
-        # Chiedi data esame
-        exam_date = input("\nExam date (YYYY-MM-DD, default: 2025-06-05): ").strip()
-        if not exam_date:
-            exam_date = "2025-06-05"
+        # Crea crew gerarchico
+        crew = Crew(
+            agents=[manager] + workers,
+            tasks=[main_task],
+            process=Process.hierarchical,
+            manager_llm=self.llm_config,
+            verbose=True
+        )
 
-        print(f"\n📅 Selected exam: {exam_date}")
+        result = crew.kickoff()
 
-        # Chiedi modalità
-        print("\nAssessment mode:")
-        print("  1. Single student")
-        print("  2. Full exam (sequential)")
-        print("  3. Full exam (parallel)")
-
-        mode = input("\nChoice (1-3): ").strip()
-
-        if mode == "1":
-            student_email = input("\nStudent email (or first 20 chars): ").strip()
-            await self.assess_single_student(exam_date, student_email)
-
-        elif mode == "2":
-            await self.assess_full_exam(exam_date, parallel=False)
-
-        elif mode == "3":
-            num_workers = input("\nNumber of workers (default: 3): ").strip()
-            num_workers = int(num_workers) if num_workers else 3
-            await self.assess_full_exam(exam_date, parallel=True, num_workers=num_workers)
-
-        else:
-            print("Invalid choice")
-            return
-
-        print("\n" + "="*70)
-        print("✅ ASSESSMENT COMPLETED")
-        print("="*70)
-
-
-# ============================================================================
-# DEMO E MAIN
-# ============================================================================
-
-async def demo_single_student():
-    """Demo: valuta un singolo studente."""
-    print("\n🎯 DEMO: Single Student Assessment")
-
-    client = CrewAIExamClient()
-
-    await client.assess_single_student(
-        exam_date="2025-06-05",
-        student_email="1377db8e05e4"  # Primi caratteri
-    )
-
-
-async def demo_full_exam_sequential():
-    """Demo: valuta esame completo in modo sequenziale."""
-    print("\n🎯 DEMO: Full Exam Sequential")
-
-    client = CrewAIExamClient()
-
-    await client.assess_full_exam(
-        exam_date="2025-06-05",
-        parallel=False
-    )
-
-
-async def demo_full_exam_parallel():
-    """Demo: valuta esame completo in parallelo."""
-    print("\n🎯 DEMO: Full Exam Parallel")
-
-    client = CrewAIExamClient()
-
-    await client.assess_full_exam(
-        exam_date="2025-06-05",
-        parallel=True,
-        num_workers=3
-    )
+        return {
+            "status": "success",
+            "exam_date": exam_date,
+            "num_workers": num_workers,
+            "result": result
+        }
 
 
 async def main():
@@ -198,31 +128,19 @@ async def main():
     print("  ✓ Support parallel processing for faster evaluation")
 
     print("\n" + "="*70)
-    print("SELECT DEMO MODE")
+    print("SELECT MODE")
     print("="*70)
     print("\n1. Single student assessment")
-    print("2. Full exam (sequential)")
-    print("3. Full exam (parallel)")
-    print("4. Interactive mode")
-    print("5. Exit")
+    print("2. Full exam")
 
+    client = CrewAIExamClient()
     choice = input("\nChoice (1-5): ").strip()
 
     if choice == "1":
-        await demo_single_student()
+        await client.single_student()
     elif choice == "2":
-        await demo_full_exam_sequential()
-    elif choice == "3":
-        await demo_full_exam_parallel()
-    elif choice == "4":
-        client = CrewAIExamClient()
-        await client.interactive_assessment()
-    elif choice == "5":
-        print("\nGoodbye!")
-        return
-    else:
-        print("\nInvalid choice")
-        return
+        await client.full_exam()
+
 
     print("\n✅ All done!")
 
