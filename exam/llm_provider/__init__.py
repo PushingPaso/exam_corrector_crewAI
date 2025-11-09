@@ -17,14 +17,14 @@ def ensure_groq_api_key():
     return os.environ.get(KEY_GROQ_API_KEY)
 
 
-def get_llm(model_name: str = "llama-3.3-70b-versatile") -> LLM:
+def get_llm(model_name: str = None, response_format=None) -> LLM:
     """
     Configura e restituisce un'istanza della classe LLM di CrewAI
     per un modello Groq specifico.
 
     Args:
         model_name (str): Il nome del modello da usare.
-                          Accetta shortcut come "llama-3.3" o "llama-8b".
+        response_format: format of the output
 
     Returns:
         LLM: Un'istanza della classe LLM di CrewAI.
@@ -34,11 +34,23 @@ def get_llm(model_name: str = "llama-3.3-70b-versatile") -> LLM:
     model_configs = {
         "llama-3.3": "llama-3.3-70b-versatile",
         "llama-8b": "llama-3.1-8b-instant",
-        "llama-inf":"meta-llama/llama-4-scout-17b-16e-instruct"
+        "llama-inf": "meta-llama/llama-4-scout-17b-16e-instruct",
     }
-    llm = LLM(
-        model = "groq/llama-3.3-70b-versatile",
-        temperature=0.1
-    )
+
+    if model_name is None:
+        model_name = "llama-3.3-70b-versatile"
+
+    # Build LLM kwargs
+    llm_kwargs = {
+        "model": f"groq/{model_name}",
+        "temperature": 0.1,
+    }
+
+    # Only add response_format if it's provided
+    if response_format is not None:
+        # For Groq, use JSON mode instead of response_format for Pydantic models
+        llm_kwargs["response_format"] = {"type": "json_object"}
+
+    llm = LLM(**llm_kwargs)
 
     return llm

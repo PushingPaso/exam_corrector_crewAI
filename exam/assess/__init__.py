@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from exam import DIR_ROOT
 from exam import get_questions_store
+from exam.llm_provider import get_llm
 from exam.solution import Answer
 
 OUTPUT_FILE = os.getenv("OUTPUT_FILE", None)
@@ -98,7 +99,6 @@ class Assessor:
             evaluations_dir: Directory per salvare le valutazioni (default: DIR_ROOT/evaluations)
         """
         from exam.llm_provider import get_llm
-        self.llm_client_func = get_llm()
 
         # Setup evaluations directory
         if evaluations_dir is None:
@@ -108,7 +108,7 @@ class Assessor:
 
         self.evaluations_dir.mkdir(parents=True, exist_ok=True)
 
-    async def assess_single_answer(
+    def assess_single_answer(
             self,
             question,
             checklist,
@@ -158,11 +158,27 @@ class Assessor:
                     answer=student_response
                 )
 
-                # Chiama il modello LLM
-                llm, _, _ = self.llm_client_func(structured_output=FeatureAssessment)
-                result = llm.invoke(prompt)
+                # With this:
+                llm = get_llm("llama-3.1-8b-instant")
 
-                # Salva risultati
+                # Modify your prompt to explicitly request JSON format
+                json_prompt = f"""{prompt}
+
+                You must respond with ONLY a valid JSON object matching this schema:
+                {{
+                    "satisfied": boolean,
+                    "motivation": string
+                }}
+
+                Do not include any additional fields or text outside the JSON object."""
+
+                result_text = llm.call(json_prompt)
+
+                # Parse the JSON response
+                import json
+                result_dict = json.loads(result_text)
+                result = FeatureAssessment(**result_dict)
+
                 feature_assessments_list.append({
                     "feature": feature.description,
                     "feature_type": feature.type.name,
@@ -195,7 +211,7 @@ class Assessor:
                 "max_score": max_score
             }
 
-    async def assess_student_exam(
+    def assess_student_exam(
             self,
             student_email: str,
             exam_questions: list,
@@ -267,7 +283,7 @@ class Assessor:
                 response_text = student_responses[question_num]
 
                 # Valuta la singola risposta
-                assessment = await self.assess_single_answer(
+                assessment = self.assess_single_answer(
                     question=question,
                     checklist=checklist,
                     student_response=response_text,

@@ -187,6 +187,7 @@ class ExamMCPServer:
             ExamMCPServer.context.loaded_exams[exam_id] = exam_data
 
             question_ids = [q["id"] for q in exam_data["questions"]]
+            student_email = [q["email"] for q in exam_data["students"]]
 
             # 2. Crea un riepilogo pulito per l'LLM
             summary_output = {
@@ -195,6 +196,7 @@ class ExamMCPServer:
                 "num_questions": len(exam_data["questions"]),
                 "num_students": len(exam_data["students"]),
                 "question_ids": question_ids,  # Invia solo gli ID
+                "student_email": student_email,
                 "message": "Exam data has been loaded into the server context. You must now use 'loading checklist tool' for each of the provided question_ids."
             }
 
@@ -213,7 +215,7 @@ class ExamMCPServer:
             return json.dumps({"error": str(e), "traceback": traceback.format_exc()})
 
     @staticmethod
-    @tool("assess student exam tool")
+    @tool("assess exam tool")
     def assess_student_exam(student_email: str) -> str:
         """
         Assess all responses for a single student from loaded exam.
@@ -282,15 +284,10 @@ class ExamMCPServer:
                 student_email=student_email_full,
                 exam_questions=questions,
                 student_responses=student_data["responses"],
-                # ACCEDE ALLO STATO DELLA CLASSE
                 questions_store=ExamMCPServer.questions_store,
                 context=ExamMCPServer.context,
-                save_results=True,
                 original_grades=student_data.get("original_grades", {})
             )
-
-            # Aggiungi metadati Moodle (ancora gestito qui per ora)
-            result["moodle_grade"] = student_data.get("moodle_grade")
 
             return json.dumps(result, indent=2)
 
