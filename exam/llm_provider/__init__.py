@@ -1,6 +1,5 @@
 import getpass
 import os
-
 from crewai import LLM
 
 KEY_GROQ_API_KEY = "GROQ_API_KEY"

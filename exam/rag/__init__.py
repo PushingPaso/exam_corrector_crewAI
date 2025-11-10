@@ -296,7 +296,7 @@ class CrewAIVectorStore:
         if vectors:
             vectors_array = np.array(vectors)
             self.index.add(vectors_array)
-            print(f"✅ Caricati {len(vectors)} vettori in memoria")
+            print(f" Caricati {len(vectors)} vettori in memoria")
 
     def similarity_search(self, query: str, k: int = 5) -> List[Document]:
         """Esegue ricerca di similarità."""
@@ -366,7 +366,7 @@ class CrewAIVectorStore:
 
                 # Se ci sono documenti esistenti, rigenera embeddings
                 if existing_texts:
-                    print(f"🔧 Rigenerazione embeddings per {len(existing_texts)} documenti...")
+                    print(f"Rigenerazione embeddings per {len(existing_texts)} documenti...")
                     old_embeddings = self.embedder.embed_batch(existing_texts)
                     faiss.normalize_L2(old_embeddings)
                     self.index.reset()
