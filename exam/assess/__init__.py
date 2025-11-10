@@ -233,6 +233,7 @@ class Assessor:
             questions_store: QuestionsStore instance
             context: AssessmentContext per accedere alle checklist
             save_results: Se True, salva i risultati su file (default: True)
+            original_grades: True grades
 
         Returns:
             dict con:

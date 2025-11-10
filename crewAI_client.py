@@ -9,7 +9,7 @@ import os
 from crewai import Agent, Task, Crew, Process
 
 from exam import DIR_ROOT
-from exam.agents import createAgents, getWorkerAgents
+from exam.agents import createAgents
 from exam.llm_provider import get_llm
 from exam.tasks import create_assessment_tasks
 
@@ -69,29 +69,18 @@ async def main():
         print("  export GROQ_API_KEY='your-key-here'")
         return
 
-    print("\n" + "="*70)
     print(" CREWAI EXAM ASSESSMENT SYSTEM")
-    print("="*70)
     print("\nThis system uses CrewAI multi-agent orchestration to:")
-    print("  ✓ Load exam data and checklists")
-    print("  ✓ Assess student answers with specialized agents")
-    print("  ✓ Generate comprehensive reports")
-    print("  ✓ Support parallel processing for faster evaluation")
+    print("  - Load exam data and checklists")
+    print("  - Assess student answers with specialized agents")
+    print("  - Generate comprehensive reports")
 
-    print("\n" + "="*70)
-    print("SELECT MODE")
-    print("="*70)
-    print("\n1. Single student assessment")
-    print("2. Full exam")
+
 
     client = CrewAIExamClient()
-    choice = input("\nChoice (1-5): ").strip()
-    exam_date = input("\n📅 Enter exam date (format: YYYY-MM-DD, e.g., 2024-01-15): ").strip()
+    exam_date = input("\n📅 Enter exam date (format: YYYY-MM-DD, e.g., 2025-06-05): ").strip()
 
-    if choice == "1":
-        await client.single_student(exam_date)
-    elif choice == "2":
-        await client.full_exam(exam_date)
+    await client.full_exam(exam_date)
 
 
     print("\n✅ All done!")

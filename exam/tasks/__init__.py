@@ -18,7 +18,7 @@ def create_assessment_tasks(
     Returns:
         Lista di Task CrewAI
     """
-    loader_agent, assessor_agent, reporter_agent = agents
+    loader_agent, assessor_agent = agents
 
     # TASK 1: Load Exam
     load_task = Task(

@@ -39,21 +39,12 @@ def createAgents(llm_config: dict) -> list[Agent]:
         allow_delegation=False
     )
 
-    # AGENT 3: Report Generator
-    reporter_agent = Agent(
-        role="Assessment Reporter",
-        goal="Generate clear, comprehensive reports of assessment results",
-        backstory="""You are a reporting specialist who creates detailed summaries
-            of exam assessments. You organize results clearly and highlight key statistics.""",
-        llm=llm_config,
-        verbose=True,
-        allow_delegation=False
-    )
-
-    return [loader_agent, assessor_agent, reporter_agent]
 
 
-def getWorkerAgents(num_workers: int, llm_config: dict) -> list[Agent]:
+    return [loader_agent, assessor_agent]
+
+
+#def getWorkerAgents(num_workers: int, llm_config: dict) -> list[Agent]:
     workers = []
     # (Questa funzione era già corretta)
     assess_feature_tool = mcp.assess_student_exam
