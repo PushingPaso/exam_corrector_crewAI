@@ -336,7 +336,7 @@ class CrewAIVectorStore:
             return results
 
         except Exception as e:
-            print(f"❌ Errore nella ricerca: {e}")
+            print(f" Errore nella ricerca: {e}")
             import traceback
             traceback.print_exc()
             return [Document(page_content="Errore nella ricerca", metadata={})]
@@ -407,7 +407,7 @@ class CrewAIVectorStore:
 
         except Exception as e:
             self.conn.rollback()
-            print(f"❌ Errore nell'aggiunta: {e}")
+            print(f" Errore nell'aggiunta: {e}")
             import traceback
             traceback.print_exc()
 
@@ -423,15 +423,12 @@ class CrewAIVectorStore:
         """Chiude la connessione al database."""
         if self.conn:
             self.conn.close()
-            print("🔒 Database chiuso")
+            print("Database chiuso")
 
     def __del__(self):
         """Chiude la connessione quando l'oggetto viene distrutto."""
         self.close()
 
-# ============================================================================
-# FUNZIONE FACTORY
-# ============================================================================
 
 def sqlite_vector_store(
         db_file: str = str(FILE_DB),
@@ -449,19 +446,16 @@ def sqlite_vector_store(
     """
     try:
         store = CrewAIVectorStore(db_file=db_file, dimension=dimension)
-        print(f"✅ Vector store inizializzato: {db_file}")
-        print(f"📊 Dimensionalità: {dimension}")
-        print(f"📊 Documenti: {store.get_collection_size()}")
+        print(f" Vector store inizialize: {db_file}")
+        print(f"Dimensionality: {dimension}")
+        print(f" Documents: {store.get_collection_size()}")
         return store
     except Exception as e:
-        print(f"❌ Errore critico: {e}")
+        print(f" Critic Error: {e}")
         import traceback
         traceback.print_exc()
         raise
 
-# ============================================================================
-# UTILITY
-# ============================================================================
 
 def populate_vector_store(store: CrewAIVectorStore, max_slides: int = None) -> int:
     """Popola il vector store con le slide."""
@@ -483,21 +477,19 @@ def populate_vector_store(store: CrewAIVectorStore, max_slides: int = None) -> i
             })
             slides_added += 1
 
-            # Batch ogni 50 slide
             if len(texts) >= 50:
                 store.add_texts(texts, metadatas)
                 texts.clear()
                 metadatas.clear()
 
-        # Aggiungi rimanenti
         if texts:
             store.add_texts(texts, metadatas)
 
-        print(f"✅ Aggiunte {slides_added} slide al vector store")
+        print(f"Aggiunte {slides_added} slide al vector store")
         return slides_added
 
     except Exception as e:
-        print(f"❌ Errore nel popolamento: {e}")
+        print(f"Errore nel popolamento: {e}")
         import traceback
         traceback.print_exc()
         return slides_added

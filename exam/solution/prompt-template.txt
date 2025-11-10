@@ -20,3 +20,11 @@ Question is:
 Below are snippets from the course material that may help you answer the question:
 
 {help}
+
+Regole:
+- "core": Lista degli elementi essenziali che DEVONO essere presenti nella risposta
+- "details_important": Lista dei dettagli importanti che arricchiscono la risposta
+- Se non ci sono elementi per una categoria, usa una lista vuota []
+- NON aggiungere spiegazioni, intestazioni o testo al di fuori del JSON
+- NON usare backticks o markdown
+- Rispondi SOLO con il JSON valido
