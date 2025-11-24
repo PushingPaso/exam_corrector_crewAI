@@ -159,7 +159,7 @@ class Assessor:
                 )
 
                 # With this:
-                llm = get_llm("llama-3.1-8b-instant")
+                llm = get_llm()
 
                 # Modify your prompt to explicitly request JSON format
                 json_prompt = f"""{prompt}

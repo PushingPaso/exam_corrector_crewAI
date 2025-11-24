@@ -37,15 +37,13 @@ class CrewAIExamClient:
             num_workers: int = 3
     ) -> dict:
 
-        print(f"\n{'=' * 70}")
-        print(f"PARALLEL ASSESSMENT with {num_workers} workers")
-        print(f"{'=' * 70}\n")
+        print("Exam ASSESSMENT")
 
         crew = Crew(
             agents=self.agents,
             tasks=create_assessment_tasks(self.agents,exam_date),
             llm=self.llm_config,
-            verbose=True
+            verbose=False
         )
 
         result = crew.kickoff()
@@ -53,7 +51,6 @@ class CrewAIExamClient:
         return {
             "status": "success",
             "exam_date": exam_date,
-            "num_workers": num_workers,
             "result": result
         }
 
@@ -78,12 +75,12 @@ async def main():
 
 
     client = CrewAIExamClient()
-    exam_date = input("\n📅 Enter exam date (format: YYYY-MM-DD, e.g., 2025-06-05): ").strip()
+    exam_date = input("\nEnter exam date (format: YYYY-MM-DD, e.g., 2025-06-05): ").strip()
 
     await client.full_exam(exam_date)
 
 
-    print("\n✅ All done!")
+    print("\nAll done!")
 
 
 if __name__ == "__main__":

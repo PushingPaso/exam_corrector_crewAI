@@ -34,14 +34,14 @@ def get_llm(model_name: str = None) -> LLM:
 
     # 1. Gestisci il default
     if model_name is None:
-        model_name = "llama-3.3-70b-versatile"  # Questo è lo shortcut
-
+        #model_name = "llama-3.3-70b-versatile"  # Questo è lo shortcut
+        model_name = "openai/gpt-4o"
 
     # 3. Crea il dizionario di configurazione
     #    Usa una f-string (la 'f' all'inizio) per inserire la variabile!
     llm = LLM(
-    model=f"groq/{model_name}",
-    temperature=0.1,
+        model=model_name,
+        stream=True  # Enable streaming
     )
 
     # 4. Restituisci il dizionario di configurazione
