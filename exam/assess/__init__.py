@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from exam import DIR_ROOT
 from exam import get_questions_store
@@ -161,9 +161,8 @@ class Assessor:
                 # With this:
                 llm = get_llm()
 
-                # Modify your prompt to explicitly request JSON format
                 json_prompt = f"""{prompt}
-
+            
                 You must respond with ONLY a valid JSON object matching this schema:
                 {{
                     "satisfied": boolean,
@@ -173,11 +172,21 @@ class Assessor:
                 Do not include any additional fields or text outside the JSON object."""
 
                 result_text = llm.call(json_prompt)
+                clean_text = result_text.strip()
+                if clean_text.startswith("```"):
+                    # Remove the first line (e.g. ```json)
+                    clean_text = clean_text.split("\n", 1)[-1]
+                    # Remove the last line (```)
+                    if clean_text.endswith("```"):
+                        clean_text = clean_text.rsplit("\n", 1)[0]
 
-                # Parse the JSON response
-                import json
-                result_dict = json.loads(result_text)
-                result = FeatureAssessment(**result_dict)
+                clean_text = clean_text.strip()
+
+                # 2. Parse using Pydantic directly
+                # This replaces json.loads(result_text) and creates the instance in one go
+                result = FeatureAssessment.model_validate_json(clean_text)
+
+                # --- NEW LOGIC END ---
 
                 feature_assessments_list.append({
                     "feature": feature.description,
@@ -188,7 +197,7 @@ class Assessor:
 
                 feature_assessments_dict[feature] = result
 
-            # Calcola il punteggio
+                # Calcola il punteggio
             score, breakdown, stats = self.calculate_score(
                 feature_assessments_dict,
                 max_score
@@ -203,6 +212,14 @@ class Assessor:
                 "feature_assessments": feature_assessments_list
             }
 
+        except ValidationError as ve:
+            # Handle specific Pydantic validation errors
+            return {
+                "status": "error",
+                "error": f"Validation Error: {str(ve)}",
+                "score": 0.0,
+                "max_score": max_score
+            }
         except Exception as e:
             return {
                 "status": "error",
