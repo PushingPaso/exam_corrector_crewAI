@@ -26,17 +26,12 @@ class CrewAIExamClient:
         self.evaluations_dir = DIR_ROOT / "evaluations"
         self.evaluations_dir.mkdir(parents=True, exist_ok=True)
 
-
-    async def single_student(self, exam_date:str):
-        pass
-
-
     async def full_exam(
             self,
             exam_date: str,
     ) -> dict:
 
-        print("Exam ASSESSMENT")
+        print("Multi-Agent Exam ASSESSMENT CrewAI")
 
         crew = Crew(
             agents=self.agents,
@@ -45,7 +40,7 @@ class CrewAIExamClient:
             verbose=False
         )
 
-        result = crew.aikickoff()
+        result = await crew.kickoff_async()
 
         return {
             "status": "success",
@@ -69,7 +64,6 @@ async def main():
     print("\nThis system uses CrewAI multi-agent orchestration to:")
     print("  - Load exam data and checklists")
     print("  - Assess student answers with specialized agents")
-    print("  - Generate comprehensive reports")
 
 
 

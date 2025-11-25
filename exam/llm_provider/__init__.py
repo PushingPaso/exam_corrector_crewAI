@@ -40,7 +40,8 @@ def get_llm(model_name: str = None) -> LLM:
     # 3. Crea il dizionario di configurazione
     #    Usa una f-string (la 'f' all'inizio) per inserire la variabile!
     llm = LLM(
-    model=f"groq/{model_name}",
+    #model=f"groq/{model_name}",
+    model = "gpt-4o",
     temperature=0.1,
     )
 

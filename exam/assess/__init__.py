@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 import sys
@@ -108,7 +109,7 @@ class Assessor:
 
         self.evaluations_dir.mkdir(parents=True, exist_ok=True)
 
-    def assess_single_answer(
+    async def assess_single_answer(
             self,
             question,
             checklist,
@@ -171,7 +172,8 @@ class Assessor:
 
                 Do not include any additional fields or text outside the JSON object."""
 
-                result_text = llm.call(json_prompt)
+                result_text = await asyncio.to_thread(llm.call, json_prompt)
+
                 clean_text = result_text.strip()
                 if clean_text.startswith("```"):
                     # Remove the first line (e.g. ```json)
@@ -228,7 +230,7 @@ class Assessor:
                 "max_score": max_score
             }
 
-    def assess_student_exam(
+    async def assess_student_exam(
             self,
             student_email: str,
             exam_questions: list,
@@ -301,7 +303,7 @@ class Assessor:
                 response_text = student_responses[question_num]
 
                 # Valuta la singola risposta
-                assessment = self.assess_single_answer(
+                assessment = await self.assess_single_answer(
                     question=question,
                     checklist=checklist,
                     student_response=response_text,
@@ -393,13 +395,9 @@ class Assessor:
 
         NUOVA FUNZIONE: Logica di generazione summary estratta da MCP server.
         """
-        lines = []
-        lines.append("STUDENT ASSESSMENT SUMMARY")
-        lines.append("=" * 70)
-        lines.append("")
-        lines.append(f"Student: {student_email}")
-        lines.append(f"Calculated Score: {result['calculated_score']:.2f}/{result['max_score']}")
-        lines.append(f"Calculated Percentage: {result['percentage']}%")
+        lines = ["STUDENT ASSESSMENT SUMMARY", "=" * 70, "", f"Student: {student_email}",
+                 f"Calculated Score: {result['calculated_score']:.2f}/{result['max_score']}",
+                 f"Calculated Percentage: {result['percentage']}%"]
 
         # Get original grades if available from first assessment
         original_grades = result.get('original_grades', {})
