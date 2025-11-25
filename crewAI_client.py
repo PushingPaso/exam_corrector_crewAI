@@ -34,7 +34,6 @@ class CrewAIExamClient:
     async def full_exam(
             self,
             exam_date: str,
-            num_workers: int = 3
     ) -> dict:
 
         print("Exam ASSESSMENT")
@@ -46,7 +45,7 @@ class CrewAIExamClient:
             verbose=False
         )
 
-        result = crew.kickoff()
+        result = crew.aikickoff()
 
         return {
             "status": "success",
