@@ -1,24 +1,19 @@
-import sqlite3
 import json
 import re
-import time
-from pathlib import Path
+import sqlite3
+
+import sqlite_vec
+from openai import OpenAI
 from pydantic import BaseModel
 
-# --- NUOVI IMPORT NATIVI ---
-from openai import OpenAI
-import sqlite_vec
-from exam.llm_provider import ensure_openai_api_key
 from exam import DIR_ROOT
+from exam.llm_provider import ensure_openai_api_key
 
-# --- COSTANTI ---
 DIR_CONTENT = DIR_ROOT / "content"
 FILE_DB = DIR_ROOT / "slides-rag.db"
 MARKDOWN_FILES = list(DIR_CONTENT.glob("**/_index.md"))
 REGEX_SLIDE_DELIMITER = re.compile(r"^\s*(---|\+\+\+)")
 
-
-# --- 1. MODELLO DATI E PARSER (Il tuo codice originale) ---
 
 class Slide(BaseModel):
     content: str
@@ -66,10 +61,10 @@ def all_slides(files=None):
             )
 
 
-# --- 2. LOGICA NATIVA (Sostituzione LangChain) ---
-
 def get_model_config(model_hint):
-    """Restituisce nome modello e dimensione vettore."""
+    """
+    Returns the model name and vector dimension based on the hint.
+    """
     model_hint = model_hint.lower() if model_hint else "small"
 
     if "large" in model_hint:
@@ -77,14 +72,13 @@ def get_model_config(model_hint):
     elif "old" in model_hint or "ada" in model_hint:
         return "text-embedding-ada-002", 1536
     else:
-        # Default: small
         return "text-embedding-3-small", 1536
 
 
 class NativeVectorStore:
     """
-    Classe wrapper che gestisce SQLite + sqlite-vec + OpenAI
-    Sostituisce le astrazioni di LangChain.
+    Wrapper class managing SQLite + sqlite-vec + OpenAI.
+    Replaces LangChain abstractions.
     """
 
     def __init__(self, db_file: str, model_name: str, dims: int, table_name: str = "se_slides"):
@@ -96,18 +90,15 @@ class NativeVectorStore:
 
         self.client = OpenAI()
 
-        # Connessione persistente
         self.conn = sqlite3.connect(db_file)
         self.conn.enable_load_extension(True)
         sqlite_vec.load(self.conn)
         self.conn.enable_load_extension(False)
 
-        # Inizializza tabelle se non esistono
         self._init_db()
 
     def _init_db(self):
         with self.conn:
-            # 1. Tabella Metadati (Testo)
             self.conn.execute(f"""
                 CREATE TABLE IF NOT EXISTS {self.table_meta} (
                     rowid INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,7 +108,6 @@ class NativeVectorStore:
                     slide_index INTEGER
                 )
             """)
-            # 2. Tabella Vettoriale (Virtuale)
             self.conn.execute(f"""
                 CREATE VIRTUAL TABLE IF NOT EXISTS {self.table_vec} USING vec0(
                     rowid INTEGER PRIMARY KEY,
@@ -126,24 +116,24 @@ class NativeVectorStore:
             """)
 
     def _get_embedding(self, text: str):
-        # Pulisce input e chiama OpenAI
         text = text.replace("\n", " ").strip()
-        if not text: return None
+        if not text:
+            return None
         return self.client.embeddings.create(input=[text], model=self.model_name).data[0].embedding
 
     def add_slide(self, slide: Slide):
-        """Genera embedding e salva nel DB."""
-        # Check preventivo stringa vuota
+        """
+        Generates embedding and saves to the database.
+        """
         clean_content = slide.content.strip()
         if not clean_content:
-            return False  # Skip
+            return False
 
         vector = self._get_embedding(clean_content)
         if not vector:
             return False
 
         with self.conn:
-            # Inserimento Metadata
             cur = self.conn.execute(f"""
                 INSERT INTO {self.table_meta} (content, source, lines, slide_index)
                 VALUES (?, ?, ?, ?)
@@ -151,7 +141,6 @@ class NativeVectorStore:
 
             row_id = cur.lastrowid
 
-            # Inserimento Vettore (Binary serialization)
             self.conn.execute(f"""
                 INSERT INTO {self.table_vec}(rowid, embedding)
                 VALUES (?, ?)
@@ -160,8 +149,7 @@ class NativeVectorStore:
 
     def search(self, query: str, k: int = 4):
         """
-        Esegue la ricerca semantica con sqlite-vec.
-        Usa la sintassi 'k = ?' richiesta da sqlite-vec per le query KNN.
+        Performs semantic search with sqlite-vec.
         """
         query_vector = self._get_embedding(query)
         if not query_vector:
@@ -169,7 +157,6 @@ class NativeVectorStore:
 
         vector_blob = sqlite_vec.serialize_float32(query_vector)
 
-        # Sintassi corretta per sqlite-vec: usa 'k = ?' nella WHERE
         sql = f"""
             WITH matches AS (
                 SELECT rowid, distance
@@ -209,8 +196,8 @@ def sqlite_vector_store(
         model: str = None,
         table_name: str = "se_slides"):
     """
-    Funzione helper per ottenere l'istanza del DB (simile alla tua vecchia implementazione).
-    Restituisce un oggetto NativeVectorStore.
+    Helper function to get the database instance.
+    Returns a NativeVectorStore object.
     """
     ensure_openai_api_key()
     model_name, dims = get_model_config(model)

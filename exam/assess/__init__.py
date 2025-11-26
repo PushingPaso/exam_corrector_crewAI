@@ -34,10 +34,7 @@ class FeatureType(str, Enum):
 
 @dataclass(frozen=True)
 class Feature:
-    # Type of the feature
     type: FeatureType
-
-    # Description of the feature
     description: str
 
     @property
@@ -50,32 +47,19 @@ class Feature:
 
     @property
     def is_core(self) -> bool:
-        """Determina se questa feature è core (essenziale)."""
         return self.type == FeatureType.CORE
 
-    @property
-    def weight_percentage(self) -> float:
-        """Restituisce il peso percentuale di questa feature nel punteggio totale."""
-        if self.type == FeatureType.CORE:
-            return 0.70  # 70% del punteggio
-        elif self.type == FeatureType.DETAILS_IMPORTANT:
-            return 0.20  # 20% del punteggio
-        else:  # DETAILS_ADDITIONAL
-            return 0.10  # 10% del punteggio
 
 
 def enumerate_features(answer: Answer):
-    """Enumera le features da valutare."""
     if not answer:
         return
     i = 0
 
-    # CORE - elementi essenziali
     for core_item in answer.core:
         yield i, Feature(type=FeatureType.CORE, description=core_item)
         i += 1
 
-    # DETAILS_IMPORTANT - dettagli importanti
     for detail in answer.details_important:
         yield i, Feature(type=FeatureType.DETAILS_IMPORTANT, description=detail)
         i += 1
@@ -88,20 +72,11 @@ class FeatureAssessment(BaseModel):
 
 class Assessor:
     """
-    Classe per la valutazione strutturata delle risposte degli studenti.
-    Include logica di assessment E salvataggio dei risultati.
+    Class for assessing the student's answer
     """
 
     def __init__(self, evaluations_dir=None):
-        """
-        Inizializza l'assessor con il modello LLM specificato.
 
-        Args:
-            evaluations_dir: Directory per salvare le valutazioni (default: DIR_ROOT/evaluations)
-        """
-        from exam.llm_provider import get_llm
-
-        # Setup evaluations directory
         if evaluations_dir is None:
             self.evaluations_dir = DIR_ROOT / "evaluations"
         else:
@@ -116,25 +91,6 @@ class Assessor:
             student_response: str,
             max_score: float
     ) -> dict:
-        """
-        Valuta una singola risposta dello studente.
-
-        Args:
-            question: Oggetto Question con id e text
-            checklist: Oggetto Answer con core e details_important
-            student_response: Testo della risposta dello studente
-            max_score: Punteggio massimo per questa domanda
-
-        Returns:
-            dict con:
-                - status: "assessed" | "error" | "no_response"
-                - score: float
-                - max_score: float
-                - statistics: dict con statistiche per tipo di feature
-                - breakdown: str con spiegazione del calcolo
-                - feature_assessments: list di assessment per ogni feature
-                - error: str (solo se status="error")
-        """
         if not student_response or student_response.strip() == '-':
             return {
                 "status": "no_response",
@@ -143,12 +99,10 @@ class Assessor:
             }
 
         try:
-            # Valuta ogni feature
             feature_assessments_list = []
             feature_assessments_dict = {}
 
             for index, feature in enumerate_features(checklist):
-                # Prepara il prompt
                 prompt = TEMPLATE.format(
                     class_name="FeatureAssessment",
                     question=question.text,
@@ -158,8 +112,6 @@ class Assessor:
                     feature=feature.description,
                     answer=student_response
                 )
-
-                # With this:
                 llm = get_llm()
 
                 json_prompt = f"""{prompt}
@@ -184,11 +136,7 @@ class Assessor:
 
                 clean_text = clean_text.strip()
 
-                # 2. Parse using Pydantic directly
-                # This replaces json.loads(result_text) and creates the instance in one go
                 result = FeatureAssessment.model_validate_json(clean_text)
-
-                # --- NEW LOGIC END ---
 
                 feature_assessments_list.append({
                     "feature": feature.description,
@@ -199,7 +147,6 @@ class Assessor:
 
                 feature_assessments_dict[feature] = result
 
-                # Calcola il punteggio
             score, breakdown, stats = self.calculate_score(
                 feature_assessments_dict,
                 max_score
@@ -241,10 +188,7 @@ class Assessor:
             original_grades: dict = None  # ← AGGIUNTO!
     ) -> dict:
         """
-        Valuta tutte le risposte di uno studente.
-
-        REFACTORIZZATO: Ora include la logica di salvataggio dei risultati.
-
+        Validate all the student answer.
         Args:
             student_email: Email dello studente
             exam_questions: Lista di dict con question info (id, number, text, score)
@@ -272,8 +216,6 @@ class Assessor:
 
         for question_info in exam_questions:
             question_num = int(question_info["number"].replace("Question ", ""))
-
-            # Verifica se lo studente ha risposto
             if question_num not in student_responses:
                 assessments.append({
                     "question_number": question_num,
@@ -287,12 +229,10 @@ class Assessor:
                 continue
 
             try:
-                # Ottieni la domanda e la checklist
                 question = questions_store.question(question_info["id"])
                 checklist = context.get_checklist(question_info["id"])
 
                 if not checklist:
-                    # Prova a caricare la checklist se non in context
                     checklist = load_answer_cache(question)
                     if checklist:
                         context.store_checklist(question_info["id"], checklist)
@@ -302,7 +242,6 @@ class Assessor:
 
                 response_text = student_responses[question_num]
 
-                # Valuta la singola risposta
                 assessment = await self.assess_single_answer(
                     question=question,
                     checklist=checklist,
@@ -310,7 +249,6 @@ class Assessor:
                     max_score=question_info["score"]
                 )
 
-                # Aggiungi metadati
                 assessment.update({
                     "question_number": question_num,
                     "question_id": question_info["id"],
@@ -345,9 +283,6 @@ class Assessor:
             "original_grades": original_grades if original_grades else {}
         }
 
-        # =========================================================
-        # NUOVA LOGICA: Salvataggio risultati (spostata da MCP)
-        # =========================================================
         if save_results:
             saved_files = self._save_assessment_results(student_email, result, exam_questions)
             result["saved_files"] = saved_files
@@ -355,29 +290,14 @@ class Assessor:
         return result
 
     def _save_assessment_results(self, student_email: str, result: dict, exam_questions: list) -> dict:
-        """
-        Salva i risultati della valutazione su file.
 
-        NUOVA FUNZIONE: Logica di salvataggio estratta da MCP server.
-
-        Args:
-            student_email: Email dello studente
-            result: Dizionario con i risultati della valutazione
-            exam_questions: Lista delle domande dell'esame (per original grades)
-
-        Returns:
-            dict con percorsi dei file salvati
-        """
-        # Crea directory studente
         student_dir = self.evaluations_dir / student_email
         student_dir.mkdir(parents=True, exist_ok=True)
 
-        # Salva assessment completo in JSON
         assessment_file = student_dir / "assessment.json"
         with open(assessment_file, 'w', encoding='utf-8') as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
 
-        # Salva summary leggibile
         summary_file = student_dir / "summary.txt"
         summary_content = self._generate_summary_text(student_email, result, exam_questions)
 
@@ -390,16 +310,11 @@ class Assessor:
         }
 
     def _generate_summary_text(self, student_email: str, result: dict, exam_questions: list) -> str:
-        """
-        Genera il testo del summary leggibile.
 
-        NUOVA FUNZIONE: Logica di generazione summary estratta da MCP server.
-        """
         lines = ["STUDENT ASSESSMENT SUMMARY", "=" * 70, "", f"Student: {student_email}",
                  f"Calculated Score: {result['calculated_score']:.2f}/{result['max_score']}",
                  f"Calculated Percentage: {result['percentage']}%"]
 
-        # Get original grades if available from first assessment
         original_grades = result.get('original_grades', {})
 
         if original_grades:
@@ -438,7 +353,6 @@ class Assessor:
                 lines.append(f"Breakdown: {assessment['breakdown']}")
                 lines.append("")
 
-                # Raggruppa per tipo
                 core_features = [fa for fa in assessment['feature_assessments']
                                  if fa['feature_type'] == 'CORE']
                 important_features = [fa for fa in assessment['feature_assessments']
@@ -472,20 +386,7 @@ class Assessor:
         return "\n".join(lines)
 
     def calculate_score(self, assessments: dict, max_score: float) -> tuple[float, str, dict]:
-        """
-        Calcola il punteggio da un dizionario di assessment.
-        Sistema:
-        - 70% Core + 30% Important (se entrambi presenti)
-        - 100% Core (se mancano Important)
-        - 100% Important (se mancano Core - caso raro)
 
-        Args:
-            assessments: dict[Feature, FeatureAssessment]
-            max_score: Punteggio massimo della domanda
-
-        Returns:
-            tuple(score, breakdown, stats): Punteggio, spiegazione, e statistiche dettagliate
-        """
         if not assessments:
             return 0.0, "No features assessed", {}
 
@@ -498,38 +399,29 @@ class Assessor:
         important_satisfied = sum(1 for f, a in assessments.items()
                                   if f.type == FeatureType.DETAILS_IMPORTANT and a.satisfied)
 
-        # Determina i pesi in base a cosa è presente
         if core_total > 0 and important_total > 0:
-            # Entrambi presenti: 70% core + 30% important
             core_weight = 0.70
             important_weight = 0.30
             scoring_system = "70% Core + 30% Important"
         elif core_total > 0:
-            # Solo core: 100% core
             core_weight = 1.0
             important_weight = 0.0
             scoring_system = "100% Core (no Important details)"
         elif important_total > 0:
-            # Solo important: 100% important
             core_weight = 0.0
             important_weight = 1.0
             scoring_system = "100% Important (no Core - unusual)"
         else:
-            # Nessuna feature
             return 0.0, "No features assessed", {}
 
-        # Calcolo percentuali per categoria
         core_percentage = (core_satisfied / core_total * core_weight) if core_total > 0 else 0.0
         important_percentage = (
                     important_satisfied / important_total * important_weight) if important_total > 0 else 0.0
 
-        # Percentuale finale
         final_percentage = core_percentage + important_percentage
 
-        # Score finale
         score = round(final_percentage * max_score, 2)
 
-        # Breakdown dettagliato
         breakdown_parts = []
 
         if core_total > 0:
@@ -552,7 +444,6 @@ class Assessor:
         breakdown += f" = {final_percentage * 100:.0f}% of {max_score} = {score}"
         breakdown += f" [{scoring_system}]"
 
-        # Statistiche dettagliate
         stats = {
             "core": {
                 "total": core_total,

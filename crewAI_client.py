@@ -1,8 +1,3 @@
-"""
-MCP Client con CrewAI Multi-Agent System.
-Sostituisce il sistema basato su LangChain agents.
-"""
-
 import asyncio
 import os
 
@@ -16,8 +11,7 @@ from exam.tasks import create_assessment_tasks
 
 class CrewAIExamClient:
     """
-    Client principale basato su CrewAI.
-    Sostituisce MCPClientDemo con sistema multi-agente.
+    Multi-Agent CrewAI client
     """
     def __init__(self):
 
@@ -50,21 +44,14 @@ class CrewAIExamClient:
 
 
 async def main():
-    """Entry point principale."""
-
-    # Verifica API key
-    if not os.environ.get("GROQ_API_KEY"):
-        print("\nGROQ_API_KEY not set!")
-        print("Get free key at: https://console.groq.com/keys")
-        print("\nSet it with:")
-        print("  export GROQ_API_KEY='your-key-here'")
-        return
 
     print(" CREWAI EXAM ASSESSMENT SYSTEM")
     print("\nThis system uses CrewAI multi-agent orchestration to:")
     print("  - Load exam data and checklists")
     print("  - Assess student answers with specialized agents")
 
+
+    os.environ["CREWAI_DISABLE_TELEMETRY"] = "true"
 
 
     client = CrewAIExamClient()

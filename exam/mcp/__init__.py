@@ -1,8 +1,3 @@
-"""
-MCP Server con Context Condiviso per collaborazione tra tool.
-REFACTORIZZATO: Logica di business spostata nei moduli appropriati.
-"""
-
 import json
 from dataclasses import dataclass, field
 from typing import Dict

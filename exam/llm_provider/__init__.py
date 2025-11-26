@@ -22,9 +22,6 @@ def ensure_openai_api_key():
 
 def get_llm(model_name: str = None) -> LLM:
     """
-
-
-
     Returns:
         llm model you ask for, gpt-4o is the default
     """
@@ -36,12 +33,12 @@ def get_llm(model_name: str = None) -> LLM:
     }
 
     if model_name is None:
-        model_name = "llama-3.3-70b-versatile"#"gpt-4o"
+        model_name = "gpt-4o"
 
 
     llm = LLM(
-    model=f"groq/{model_name}",
-    #model = model_name,
+    #model=f"groq/{model_name}",
+    model = model_name,
     temperature=0.1,
     )
 
@@ -53,6 +50,8 @@ class AIOracle:
 
     def __init__(self, model_name: str = None):
         self.__llm = get_llm(model_name)
+        # Store the model name (handling the None case if needed, or just what was passed)
+        self._model_name = model_name if model_name else "llama-3.3-70b-versatile"
 
     @property
     def llm(self):
@@ -60,7 +59,7 @@ class AIOracle:
 
     @property
     def model_name(self):
-        return self.model_name
+        return self._model_name
 
     @property
     def model_provider(self):

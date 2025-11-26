@@ -11,23 +11,22 @@ DIR_SOLUTIONS = DIR_ROOT / "solutions"
 DIR_SOLUTIONS.mkdir(exist_ok=True)
 
 
-
 class Answer(BaseModel):
     core: list[str] = Field(
-        description="Elementi essenziali che devono essere presenti nella risposta perfetta per rispondere alla parte più importante della domanda. Ogni item è una stringa Markdown.",
+        description="Essential elements that must be present in the perfect answer to address the most important part of the question. Each item is a Markdown string.",
     )
     details_important: list[str] = Field(
-        description="Dettagli importanti che dovrebbero essere menzionati per arricchire la risposta. Ogni item è una stringa Markdown.",
+        description="Important details that should be mentioned to enrich the answer. Each item is a Markdown string.",
     )
 
     def pretty(self, indent=0, prefix="\t") -> str:
-        result = "Core (elementi essenziali):\n"
+        result = "Core (essential elements):\n"
         if self.core:
             result += "\n".join(f"- {item}" for item in self.core) + "\n"
         else:
             result += "- <none>\n"
 
-        result += "Details - Importanti:\n"
+        result += "Details - Important:\n"
         if self.details_important:
             result += "\n".join(f"- {item}" for item in self.details_important) + "\n"
         else:
@@ -44,7 +43,7 @@ TEMPLATE = FILE_TEMPLATE.read_text(encoding="utf-8")
 
 def get_prompt(question: str, *helps: str) -> str:
     """
-    Crea il prompt usando la formattazione standard di Python.
+    Creates the prompt using standard Python formatting.
     """
     help_string = "\n\n".join(helps) if helps else ""
 
@@ -65,10 +64,9 @@ def save_cache(
         helps: list[str] = None,
         model_name: str = None,
         model_provider: str = None):
-    print("hi")
     cache_file_path = cache_file(question)
     with open(cache_file_path, "w", encoding="utf-8") as f:
-        print(f"# saving answer to {cache_file_path}")
+        print(f"Saving answer to {cache_file_path}")
         yaml = answer.model_dump()
         yaml["question"] = question.text
         yaml["helps"] = helps
@@ -87,7 +85,7 @@ def load_cache(question: Question) -> Answer | None:
     if not cache_file_path.exists():
         return None
     with open(cache_file_path, "r", encoding="utf-8") as f:
-        print(f"# loading cached answer from {cache_file_path}")
+        print(f"Loading cached answer from {cache_file_path}")
         try:
             cached_answer = safe_load(f)
             return Answer(
@@ -95,7 +93,7 @@ def load_cache(question: Question) -> Answer | None:
                 details_important=cached_answer.get("details_important", []),
             )
         except Exception as e:
-            print(f"# error loading cached answer from {cache_file_path}: {e}")
+            print(f"Error loading cached answer from {cache_file_path}: {e}")
             cache_file_path.unlink()
             return None
 
@@ -117,22 +115,15 @@ class SolutionProvider(AIOracle):
 
         prompt = get_prompt(text, *helps)
 
-        try:
-            print(f"# Calling LLM for question: {question.id}")
-            result_msg = self.llm.call(prompt)
-            print(f"# LLM response received")
-        except Exception as e:
-            print(f"# ERROR calling LLM: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
+        result_msg = self.llm.call(prompt)
+
         result_clean = result_msg.strip()
         if result_clean.startswith("```json"):
-                result_clean = result_clean[7:]
+            result_clean = result_clean[7:]
         if result_clean.startswith("```"):
-                result_clean = result_clean[3:]
+            result_clean = result_clean[3:]
         if result_clean.endswith("```"):
-                result_clean = result_clean[:-3]
+            result_clean = result_clean[:-3]
         result_clean = result_clean.strip()
 
         data = json.loads(result_clean)
@@ -140,7 +131,4 @@ class SolutionProvider(AIOracle):
         answer = Answer(**data)
         print(answer)
         save_cache(question, answer, helps, self.model_name, self.model_provider)
-        print("fine")
         return answer
-
-
