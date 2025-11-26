@@ -11,6 +11,7 @@ DIR_SOLUTIONS = DIR_ROOT / "solutions"
 DIR_SOLUTIONS.mkdir(exist_ok=True)
 
 
+
 class Answer(BaseModel):
     core: list[str] = Field(
         description="Elementi essenziali che devono essere presenti nella risposta perfetta per rispondere alla parte più importante della domanda. Ogni item è una stringa Markdown.",
@@ -45,7 +46,6 @@ def get_prompt(question: str, *helps: str) -> str:
     """
     Crea il prompt usando la formattazione standard di Python.
     """
-    # Combina gli "helps" come faceva prima LangChain
     help_string = "\n\n".join(helps) if helps else ""
 
     return TEMPLATE.format(
@@ -65,6 +65,7 @@ def save_cache(
         helps: list[str] = None,
         model_name: str = None,
         model_provider: str = None):
+    print("hi")
     cache_file_path = cache_file(question)
     with open(cache_file_path, "w", encoding="utf-8") as f:
         print(f"# saving answer to {cache_file_path}")
@@ -125,30 +126,21 @@ class SolutionProvider(AIOracle):
             import traceback
             traceback.print_exc()
             raise
-
-        result_content = result_msg.content if hasattr(result_msg, 'content') else str(result_msg)
-
-        try:
-            result_clean = result_content.strip()
-            if result_clean.startswith("```json"):
+        result_clean = result_msg.strip()
+        if result_clean.startswith("```json"):
                 result_clean = result_clean[7:]
-            if result_clean.startswith("```"):
+        if result_clean.startswith("```"):
                 result_clean = result_clean[3:]
-            if result_clean.endswith("```"):
+        if result_clean.endswith("```"):
                 result_clean = result_clean[:-3]
-            result_clean = result_clean.strip()
+        result_clean = result_clean.strip()
 
-            data = json.loads(result_clean)
+        data = json.loads(result_clean)
 
-            if isinstance(data, list):
-                raise ValueError("LLM returned a list instead of a dictionary")
+        answer = Answer(**data)
+        print(answer)
+        save_cache(question, answer, helps, self.model_name, self.model_provider)
+        print("fine")
+        return answer
 
-            answer = Answer(**data)
 
-            save_cache(question, answer, helps, self.model_name, self.model_provider)
-            return answer
-
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"ERROR parsing response: {e}")
-            print(f"RAW Response: {result_content}")
-            raise ValueError(f"Failed to parse LLM response into {Answer.__name__}: {e}")
