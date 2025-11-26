@@ -1,99 +1,120 @@
-import argparse
-import shutil
+import sys
+import os
+import time
+from exam.rag import sqlite_vector_store, all_slides, FILE_DB
 
-from exam.rag import *
+
+def print_separator():
+    print("-" * 60)
+
+
+def recreate_database():
+    if os.path.exists(FILE_DB):
+        try:
+            os.remove(FILE_DB)
+            print(f"Deleted existing database: {FILE_DB}")
+        except OSError as e:
+            print(f"Error deleting database: {e}")
+            return
+
+    print(f"Creating new database at: {FILE_DB}")
+
+    try:
+        vstore = sqlite_vector_store(table_name="se_slides")
+    except Exception as e:
+        print(f"Initialization error: {e}")
+        return
+
+    slides = list(all_slides())
+    total_slides = len(slides)
+    print(f"Found {total_slides} slides to process.")
+
+    count = 0
+    skipped = 0
+    start_time = time.time()
+
+    for s in slides:
+        try:
+            success = vstore.add_slide(s)
+            if success:
+                count += 1
+                if count % 50 == 0:
+                    print(f"Processed {count}/{total_slides} slides...")
+            else:
+                skipped += 1
+        except Exception as e:
+            print(f"Error processing slide {s.index} ({s.source}): {e}")
+
+    vstore.close()
+
+    elapsed = time.time() - start_time
+    print_separator()
+    print(f"Database generation complete.")
+    print(f"Total added: {count}")
+    print(f"Total skipped: {skipped}")
+    print(f"Time taken: {elapsed:.2f}s")
+
+
+def interactive_search():
+    if not os.path.exists(FILE_DB):
+        print(f"ERROR: Database {FILE_DB} not found.")
+        print("Run 'python main.py --fill' to generate it.")
+        return
+
+    print(f"Loading database from: {FILE_DB}")
+
+    try:
+        vstore = sqlite_vector_store(table_name="se_slides")
+    except Exception as e:
+        print(f"Connection error: {e}")
+        return
+
+    print("\nSystem ready. Type your query (or 'exit' to quit).")
+    print_separator()
+
+    while True:
+        try:
+            query = input("\nQuery: ").strip()
+
+            if query.lower() in ["exit", "quit"]:
+                print("Exiting...")
+                break
+
+            if not query:
+                continue
+
+            print("Searching...")
+
+            results = vstore.search(query, k=3)
+
+            if not results:
+                print("No results found.")
+                continue
+
+            print(f"\nFound {len(results)} results:\n")
+
+            for i, res in enumerate(results, 1):
+                dist = res['distance']
+                source_clean = res['source'].replace("\\", "/")
+
+                print(f"#{i} [Distance: {dist:.4f}] {source_clean} (Slide {res['index']})")
+                print("..." + res['content'].replace("\n", " ")[:200] + "...")
+                print_separator()
+
+        except KeyboardInterrupt:
+            print("\nInterrupted by user.")
+            break
+        except Exception as e:
+            print(f"\nSearch error: {e}")
+
+    vstore.close()
 
 
 def main():
-    parser = argparse.ArgumentParser(description='RAG Vector Store Manager con FAISS')
-    parser.add_argument('--fill', action='store_true',
-                        help='Riempie il vector store con le slide del corso')
-    parser.add_argument('--dimension', type=int, default=1000,
-                        help='Dimensionalità degli embeddings (default: 1000)')
-    parser.add_argument('--force', action='store_true',
-                        help='Forza la ricreazione del database (elimina quello esistente)')
-    parser.add_argument('--model', type=str, default='faiss',
-                        help='Modello (mantenuto per compatibilità, usa sempre FAISS)')
-
-    args = parser.parse_args()
-
-    if args.fill:
-        print(f"# Creazione vector store FAISS con {args.dimension} dimensioni")
-
-        # Forza ricreazione se richiesto
-        if args.force:
-            if os.path.exists(DIR_RAG_DB):
-                print(f"# Eliminazione database esistente: {DIR_RAG_DB}")
-                shutil.rmtree(DIR_RAG_DB)
-
-        # Crea vector store
-        vector_store = sqlite_vector_store(dimension=args.dimension)
-
-        print(f"# Vector store creato in {DIR_RAG_DB}")
-        print(f"# Riempimento con le slide del corso...")
-
-        slide_count = 0
-        batch_texts = []
-        batch_metadatas = []
-
-        for slide in all_slides():
-            batch_texts.append(slide.content)
-            batch_metadatas.append({
-                "source": slide.source,
-                "lines": slide.lines,
-                "index": slide.index
-            })
-            slide_count += 1
-
-            # Aggiungi in batch di 50
-            if len(batch_texts) >= 50:
-                vector_store.add_texts(batch_texts, batch_metadatas)
-                print(f"# Aggiunte {slide_count} slide...")
-                batch_texts = []
-                batch_metadatas = []
-
-        # Aggiungi eventuali rimanenti
-        if batch_texts:
-            vector_store.add_texts(batch_texts, batch_metadatas)
-
-        print(f"# Vector store riempito con successo: {slide_count} slide")
-        print(f"# Dimensionalità: {vector_store.get_dimensionality()}")
-        print(f"# Documenti totali: {vector_store.get_collection_size()}")
-
+    if "--fill" in sys.argv:
+        recreate_database()
     else:
-        # Modalità query
-        vector_store = sqlite_vector_store(dimension=args.dimension)
-
-        print(f"# Vector store caricato con successo")
-        print(f"# Dimensionalità: {vector_store.get_dimensionality()}")
-        print(f"# Documenti: {vector_store.get_collection_size()}")
-        print(f"\n# Inserisci query (oppure 'exit' per uscire):\n")
-
-        while True:
-            try:
-                query = input("\t> ")
-                if query.strip().lower() == 'exit':
-                    break
-
-                results = vector_store.similarity_search(query, k=3)
-
-                print(f"\n\t# Trovati {len(results)} risultati:\n")
-                for i, doc in enumerate(results, 1):
-                    source = doc.metadata.get('source', 'Unknown')
-                    print(f"\t# Risultato {i} - Fonte: {source}")
-
-                    # Mostra preview del contenuto
-                    content = doc.page_content[:200].replace("\n", "\n\t\t")
-                    print(f"\t\t{content}")
-                    if len(doc.page_content) > 200:
-                        print("\t\t...")
-                    print("\t\t---\n")
-
-            except (EOFError, KeyboardInterrupt):
-                print("\n")
-                break
-
-    print("# Arrivederci!")
+        interactive_search()
 
 
 if __name__ == "__main__":

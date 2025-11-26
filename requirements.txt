@@ -5,16 +5,14 @@ mcp>=1.0.0
 crewai>=0.28.0
 crewai-tools>=0.4.0
 litellm
-# LLM providers for CrewAI
 
-# HuggingFace for embeddings
-sentence-transformers>=2.2.0
-transformers>=4.30.0
+
 torch>=2.0.0
 
-# Vector store
-sqlitedict>=2.1.0
-chromadb
+#rag_dependecies
+openai
+sqlite-vec
+
 # Data processing
 pydantic>=2.0.0
 PyYAML>=6.0

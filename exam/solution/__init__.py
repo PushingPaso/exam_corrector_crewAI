@@ -2,7 +2,6 @@ import json
 
 from pydantic import BaseModel, Field
 from yaml import safe_dump, safe_load
-
 from exam import DIR_ROOT, Question
 from exam.llm_provider import AIOracle
 from exam.rag import sqlite_vector_store
@@ -49,7 +48,6 @@ def get_prompt(question: str, *helps: str) -> str:
     # Combina gli "helps" come faceva prima LangChain
     help_string = "\n\n".join(helps) if helps else ""
 
-    # Usa il metodo .format() standard di Python
     return TEMPLATE.format(
         class_name=Answer.__name__,
         question=question,
@@ -105,44 +103,52 @@ class SolutionProvider(AIOracle):
     def __init__(self, model_name: str = None):
         super().__init__(model_name)
         self.__vector_store = sqlite_vector_store()
-        self.__use_helps = self.__vector_store.get_dimensionality() > 0
+        self.__use_helps = self.__vector_store.dims > 0
 
     def answer(self, question: Question, max_helps=5) -> Answer:
         if cache := load_cache(question):
             return cache
         text = question.text
         helps = []
+
         if self.__use_helps:
-            helps = [doc.page_content for doc in self.__vector_store.similarity_search(text, k=max_helps)]
+            helps = [doc['content'] for doc in self.__vector_store.search(text, k=max_helps)]
 
         prompt = get_prompt(text, *helps)
-        result = self.llm.call(prompt)
 
         try:
-            # Se result è una stringa, fai il parsing JSON
-            if isinstance(result, str):
-                # Rimuovi eventuali backticks markdown se presenti
-                result_clean = result.strip()
-                if result_clean.startswith("```json"):
-                    result_clean = result_clean[7:]
-                if result_clean.startswith("```"):
-                    result_clean = result_clean[3:]
-                if result_clean.endswith("```"):
-                    result_clean = result_clean[:-3]
-                result_clean = result_clean.strip()
+            print(f"# Calling LLM for question: {question.id}")
+            result_msg = self.llm.call(prompt)
+            print(f"# LLM response received")
+        except Exception as e:
+            print(f"# ERROR calling LLM: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
-                # Parse JSON e crea oggetto Answer
-                data = json.loads(result_clean)
-                answer = Answer(**data)
-            elif isinstance(result, dict):
-                answer = Answer(**result)
-            elif isinstance(result, Answer):
-                answer = result
-            else:
-                raise ValueError(f"Unexpected result type: {type(result)}")
+        result_content = result_msg.content if hasattr(result_msg, 'content') else str(result_msg)
+
+        try:
+            result_clean = result_content.strip()
+            if result_clean.startswith("```json"):
+                result_clean = result_clean[7:]
+            if result_clean.startswith("```"):
+                result_clean = result_clean[3:]
+            if result_clean.endswith("```"):
+                result_clean = result_clean[:-3]
+            result_clean = result_clean.strip()
+
+            data = json.loads(result_clean)
+
+            if isinstance(data, list):
+                raise ValueError("LLM returned a list instead of a dictionary")
+
+            answer = Answer(**data)
 
             save_cache(question, answer, helps, self.model_name, self.model_provider)
             return answer
 
         except (json.JSONDecodeError, ValueError) as e:
-            raise ValueError(f"Failed to parse LLM response into {Answer.__name__}: {e}\nResponse: {result}")
+            print(f"ERROR parsing response: {e}")
+            print(f"RAW Response: {result_content}")
+            raise ValueError(f"Failed to parse LLM response into {Answer.__name__}: {e}")

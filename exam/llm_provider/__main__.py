@@ -9,13 +9,13 @@ def main():
     print(f"\nOttenuto LLM (default):")
     print(f"  Modello: {default_llm}")
     print(f"  Classe: {type(default_llm)}")
+    default_llm.call("Whats the capital of italy?")
 
     # 2. Ottenere l'LLM usando uno shortcut
     llm_8b = get_llm(model_name="llama-8b")
     print(f"\nOttenuto LLM (shortcut 'llama-8b'):")
     print(f"  Modello: {llm_8b}")
     print(f"  Classe: {type(llm_8b)}")
-
 
 
 if __name__ == "__main__":
