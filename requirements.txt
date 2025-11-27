@@ -6,7 +6,7 @@ crewai>=0.28.0
 crewai-tools>=0.4.0
 litellm
 
-
+mlflow
 torch>=2.0.0
 
 #rag_dependecies
