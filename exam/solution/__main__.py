@@ -20,4 +20,4 @@ for q in targets:
         print(a.pretty(indent=1))
         print("---")
 
-        print("Done.")
+print("Done.")

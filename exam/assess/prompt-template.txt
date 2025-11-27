@@ -17,10 +17,8 @@ For CORE elements:
 - Focus on: does the student understand the main idea?
 
 For IMPORTANT DETAILS:
-- Mark as SATISFIED if the detail is mentioned
-- Accept related concepts that show understanding
+- Mark as SATISFIED if the detail concept is mentioned
 - DO NOT penalize for missing technical terminology if the concept is clear
-
 
 
 Your motivation should be:

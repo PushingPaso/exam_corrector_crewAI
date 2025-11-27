@@ -36,12 +36,18 @@ class CrewAIExamClient:
 
         result = await crew.kickoff_async()
 
+        # EXTRACT TOKEN METRICS
+        usage = result.token_usage
+        print(f"\n[COST] Total Tokens: {usage.total_tokens}")
+        print(f"[COST] Prompt Tokens: {usage.prompt_tokens}")
+        print(f"[COST] Completion Tokens: {usage.completion_tokens}")
+
         return {
             "status": "success",
             "exam_date": exam_date,
-            "result": result
+            "result": result,
+            "tokens": usage
         }
-
 
 async def main():
 
