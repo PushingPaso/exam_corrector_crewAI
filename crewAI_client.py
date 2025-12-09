@@ -74,7 +74,7 @@ async def main():
     exam_date = input("\nEnter exam date (format: YYYY-MM-DD, e.g., 2025-06-05): ").strip()
     mlflow.set_tracking_uri("http://localhost:5000")
     mlflow.set_experiment("CrewAI_Exam_Assessment")
-    mlflow.openai.autolog()
+    mlflow.crewai.autolog()
     await client.full_exam(exam_date)
 
     print("\nAll done!")
