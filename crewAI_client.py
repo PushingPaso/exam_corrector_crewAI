@@ -7,6 +7,7 @@ from crewai import Crew
 from exam import DIR_ROOT
 from exam.agents import createAgents
 from exam.llm_provider import get_llm
+from exam.mlflow import calculate_overhead
 from exam.tasks import create_assessment_tasks
 
 
@@ -19,8 +20,11 @@ class CrewAIExamClient:
 
     async def full_exam(self, exam_date: str) -> dict:
 
+        mlflow.set_tracking_uri("http://localhost:5000")
+        experiment = mlflow.set_experiment("CrewAI_Exam_Assessment")
+        mlflow.crewai.autolog()
 
-        with mlflow.start_run():
+        with mlflow.start_run() as run:
             mlflow.log_param("framework", "CrewAI")
             mlflow.log_param("exam_date", exam_date)
             mlflow.log_param("model_name", getattr(self.llm_config, "model", "unknown"))
@@ -44,6 +48,7 @@ class CrewAIExamClient:
             prompt_tokens = usage.prompt_tokens
             completion_tokens = usage.completion_tokens
 
+
             print(f"Total Tokens: {total_tokens}")
             print(f"Prompt Tokens: {prompt_tokens}")
             print(f"Completion Tokens: {completion_tokens}")
@@ -53,6 +58,9 @@ class CrewAIExamClient:
             mlflow.log_metric("prompt_tokens", prompt_tokens)
             mlflow.log_metric("completion_tokens", completion_tokens)
             mlflow.log_metric("duration_seconds", duration)
+
+            calculate_overhead(run.info.run_id, duration)
+
 
             return {
                 "status": "success",
@@ -72,9 +80,6 @@ async def main():
 
     client = CrewAIExamClient()
     exam_date = input("\nEnter exam date (format: YYYY-MM-DD, e.g., 2025-06-05): ").strip()
-    mlflow.set_tracking_uri("http://localhost:5000")
-    mlflow.set_experiment("CrewAI_Exam_Assessment")
-    mlflow.crewai.autolog()
     await client.full_exam(exam_date)
 
     print("\nAll done!")
