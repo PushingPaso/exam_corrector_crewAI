@@ -33,7 +33,7 @@ def get_llm(model_name: str = None) -> LLM:
     }
 
     if model_name is None:
-        model_name = "gpt-4o"
+        #model_name = "gpt-4o"
         model_name ="gpt-4.1-mini"
 
 

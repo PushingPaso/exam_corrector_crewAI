@@ -21,9 +21,8 @@ class CrewAIExamClient:
     async def full_exam(self, exam_date: str) -> dict:
 
         mlflow.set_tracking_uri("http://localhost:5000")
-        experiment = mlflow.set_experiment("CrewAI_Exam_Assessment")
-        mlflow.crewai.autolog()
-
+        mlflow.set_experiment("CrewAI_Exam_Assessment")
+        mlflow.openai.autolog()
         with mlflow.start_run() as run:
             mlflow.log_param("framework", "CrewAI")
             mlflow.log_param("exam_date", exam_date)
@@ -35,8 +34,7 @@ class CrewAIExamClient:
                 agents=self.agents,
                 tasks=create_assessment_tasks(self.agents, exam_date),
                 llm=self.llm_config,
-                verbose=False
-            )
+                verbose=False)
 
             start_time = time.time()
             result = await crew.kickoff_async()
@@ -49,9 +47,9 @@ class CrewAIExamClient:
             completion_tokens = usage.completion_tokens
 
 
-            print(f"Total Tokens: {total_tokens}")
-            print(f"Prompt Tokens: {prompt_tokens}")
-            print(f"Completion Tokens: {completion_tokens}")
+            print(f"CrewAI Total Tokens: {total_tokens}")
+            print(f"CrewAI Prompt Tokens: {prompt_tokens}")
+            print(f"CrewAI Completion Tokens: {completion_tokens}")
             print(f"Duration (seconds): {duration:.2f}")
 
             mlflow.log_metric("total_tokens", total_tokens)
