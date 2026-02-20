@@ -1,0 +1,193 @@
+STUDENT ASSESSMENT SUMMARY
+======================================================================
+
+Student: f05177a871d2cba4d711324c60e1c50cd197577f882800af01d66dd48502a9b9c971369b9e18dd32bbcc2b8431e9658af2e9ad1edfdb2c51bd7e15008ec9a29a
+Calculated Score: 9.90/27.0
+Calculated Percentage: 36.7%
+Original Moodle Grade: 10.50/27.00
+Scoring System: 70% Core + 30% Important_Details
+
+======================================================================
+
+Question 1: Definition-33
+----------------------------------------------------------------------
+Calculated Score: 2.10/3.0
+Original Grade: 1.00/3.0
+Difference: +1.10
+Breakdown: Core: 2/2 (100% → 70%) + Important: 0/2 (0% → 0%) = 70% of 3.0 = 2.1 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] Compiled languages are translated into machine code via a compiler before execution.
+       You clearly explain that compiled languages are translated into an executable via a compiler before execution, which shows you understand the core concept well. Good job including examples and contrasting with interpreted languages.
+
+  [✓ OK] Interpreted languages are executed by an interpreter, translating code on the fly.
+       You correctly explained that interpreted languages are executed by an interpreter that reads and runs the program, which shows you understand the core concept of interpretation as translation on the fly.
+
+Important Details:
+  [✗ MISSING] Compiled languages may have faster execution as the machine code is optimized for the target CPU.
+       You explained the basic difference between compiled and interpreted languages well, but you did not mention that compiled languages may have faster execution because the machine code is optimized for the target CPU. Including this detail would show a deeper understanding of the performance implications.
+
+  [✗ MISSING] Interpreted languages allow for a faster write-test-debug cycle.
+       You explained the basic difference between compiled and interpreted languages well, showing understanding of the fundamental concept. However, you did not mention that interpreted languages allow for a faster write-test-debug cycle, which is an important detail to highlight the practical implications of interpretation.
+
+
+======================================================================
+
+Question 2: Modelling-2
+----------------------------------------------------------------------
+Calculated Score: 1.05/3.0
+Original Grade: 1.00/3.0
+Difference: +0.05
+Breakdown: Core: 1/2 (50% → 35%) + Important: 0/2 (0% → 0%) = 35% of 3.0 = 1.05 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] Software can be modelled using the Unified Modelling Language (UML).
+       You correctly mention that software systems are modelled using the Unified Modelling Language (UML), demonstrating a clear understanding of the fundamental concept. Well done on linking modelling to representing the world formally.
+
+  [✗ MISSING] Software modelling involves creating a simplified representation of the software system, focusing on classes/functions, their relationships, behaviours, and interactions.
+       You mention UML and the idea of modelling the world, which is a good start, but you do not explain that software modelling involves creating simplified representations focusing on classes/functions, their relationships, behaviours, and interactions. Including these elements would show a clearer understanding of how software is modelled.
+
+Important Details:
+  [✗ MISSING] Software models help in understanding, explaining, and predicting the behaviour of software systems.
+       You mention that software models represent the world and that source code is a model, which is a good start. However, you do not explicitly explain that software models help in understanding, explaining, and predicting the behaviour of software systems, which is the key detail required.
+
+  [✗ MISSING] Software modelling is essential for managing complexity in large projects by providing more abstract and visual ways to represent software systems.
+       You mention UML and the idea of modelling the world, which shows some understanding of software modelling. However, you do not address the important detail that software modelling helps manage complexity in large projects by providing more abstract and visual representations. Including this aspect would strengthen your answer.
+
+
+======================================================================
+
+Question 3: DistributedSystems-30
+----------------------------------------------------------------------
+Calculated Score: 0.00/3.0
+Original Grade: 1.00/3.0
+Difference: -1.00
+Breakdown: Core: 0/2 (0% → 0%) + Important: 0/2 (0% → 0%) = 0% of 3.0 = 0.0 [70% Core + 30% Important]
+
+CORE Elements:
+  [✗ MISSING] A broker can exploit a queue by storing messages in a FIFO manner to ensure they are consumed in the order they were produced.
+       You correctly describe a queue as a FIFO data structure, which is a good start. However, you do not explain how a broker exploits this queue to store messages and ensure they are consumed in the order they were produced. Including this connection would demonstrate a full understanding of the core concept.
+
+  [✗ MISSING] The broker mediates communication between producers and consumers by receiving messages from producers and forwarding them to consumers.
+       You correctly describe a queue as a FIFO data structure, but you do not explain how the broker mediates communication between producers and consumers by receiving and forwarding messages. To fully address the question, you need to show understanding of the broker's role in exploiting the queue for message passing.
+
+Important Details:
+  [✗ MISSING] Messages are not lost if consumers are unavailable, as they are stored in the queue until they can be consumed.
+       You correctly described the queue as a FIFO data structure, which shows some understanding. However, you did not mention that messages are stored in the queue to prevent loss when consumers are unavailable, which is the important detail needed here.
+
+  [✗ MISSING] The broker can decouple producers from consumers, allowing for more flexible and scalable system architecture.
+       You correctly described the queue as a FIFO data structure, but you did not explain how a broker exploits a queue to decouple producers from consumers, which is key to understanding its role in distributed systems.
+
+
+======================================================================
+
+Question 4: GHA-1
+----------------------------------------------------------------------
+Calculated Score: 0.00/3.0
+Original Grade: 0.50/3.0
+Difference: -0.50
+Breakdown: Core: 0/1 (0% → 0%) + Important: 0/2 (0% → 0%) = 0% of 3.0 = 0.0 [70% Core + 30% Important]
+
+CORE Elements:
+  [✗ MISSING] GitHub Actions is a CI/CD platform that allows developers to automate their software workflows directly in their GitHub repositories.
+       You mention automation of tasks within software development workflows, which is good, but you do not specify that GitHub Actions is a CI/CD platform integrated directly into GitHub repositories. Including this core aspect would show a clearer understanding of what GitHub Actions fundamentally is.
+
+Important Details:
+  [✗ MISSING] Workflows are configured using YAML files located in the .github/workflows/ folder of the repository.
+       You correctly identified that GitHub Actions automates tasks within the software development workflow, which shows understanding of the core concept. However, you did not mention that workflows are configured using YAML files located in the .github/workflows/ folder of the repository, which is an important detail for understanding how GitHub Actions is set up.
+
+  [✗ MISSING] Workflows consist of jobs, which are made up of steps, and can be triggered by events such as pushes, pull requests, or manual triggers.
+       You correctly identified that GitHub Actions automates tasks within software development workflows, which shows understanding of the core concept. However, you did not mention that workflows consist of jobs made up of steps, nor that they can be triggered by events such as pushes, pull requests, or manual triggers. Including these details would demonstrate a fuller understanding of how GitHub Actions operates.
+
+
+======================================================================
+
+Question 5: Git-24
+----------------------------------------------------------------------
+Calculated Score: 2.10/3.0
+Original Grade: 2.50/3.0
+Difference: -0.40
+Breakdown: Core: 2/2 (100% → 70%) + Important: 0/2 (0% → 0%) = 70% of 3.0 = 2.1 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] Use the command `git clone <repository-url>` to clone the repository.
+       You correctly mention the use of the 'git clone' command and explain its effect of creating a local copy of the repository, demonstrating a clear understanding of the fundamental concept.
+
+  [✓ OK] The command copies the repository from GitHub to your local machine.
+       You clearly understand that the git clone command copies the repository from GitHub to your local machine, which is the core concept required. Well done on expressing this fundamental idea.
+
+Important Details:
+  [✗ MISSING] Ensure you have the necessary permissions to access the repository.
+       You explained the git clone command well, showing understanding of how to create a local copy of the repository. However, you did not mention the important detail about ensuring you have the necessary permissions to access the repository, which is crucial before cloning.
+
+  [✗ MISSING] The repository URL can be found on the GitHub page of the repository you want to clone.
+       You correctly explained the use of the 'git clone' command and its effect, showing understanding of the fundamental concept. However, you did not mention that the repository URL can be found on the GitHub page of the repository, which is an important detail for locating the correct URL to clone.
+
+
+======================================================================
+
+Question 6: Lincense-3
+----------------------------------------------------------------------
+Calculated Score: 0.45/3.0
+Original Grade: 1.50/3.0
+Difference: -1.05
+Breakdown: Core: 0/2 (0% → 0%) + Important: 1/2 (50% → 15%) = 15% of 3.0 = 0.45 [70% Core + 30% Important]
+
+CORE Elements:
+  [✗ MISSING] Copyleft is a practice where the creator surrenders some rights under copyright law.
+       You correctly describe the key condition of copyleft licenses, but you do not mention that copyleft involves the creator surrendering some rights under copyright law. Including this aspect would show a fuller understanding of the fundamental concept.
+
+  [✗ MISSING] It is not a legal right but a practice.
+       You explained the key condition of copyleft well, but you did not mention that copyleft is a practice rather than a legal right. Including this distinction would show a fuller understanding of the concept.
+
+Important Details:
+  [✓ OK] Strong copyleft means all derived works inherit the copyleft license.
+       You clearly explained that derivative works must be released under the same license, which captures the essence of strong copyleft. This shows you understand that all derived works inherit the copyleft license.
+
+  [✗ MISSING] Weak copyleft means some derived works may not inherit the copyleft license.
+       You correctly explained the core concept of copyleft requiring derivative works to be under the same license, which shows good understanding of the fundamental idea. However, you did not mention the important detail about weak copyleft, specifically that some derived works may not inherit the copyleft license. Including this distinction would make your answer more complete.
+
+
+======================================================================
+
+Question 7: Python-15
+----------------------------------------------------------------------
+Calculated Score: 2.10/3.0
+Original Grade: 1.50/3.0
+Difference: +0.60
+Breakdown: Core: 1/1 (100% → 70%) + Important: 0/1 (0% → 0%) = 70% of 3.0 = 2.1 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] Class attributes are marked as private by prefixing their names with double underscores (__).
+       You correctly explain that prefixing the attribute name with double underscores (__) marks it as private, demonstrating a clear understanding of the core concept.
+
+Important Details:
+  [✗ MISSING] Private attributes are not accessible from outside the class, not even from derived classes.
+       You correctly mention using double underscores and name mangling to make the attribute harder to access from outside the class, which shows understanding of the core concept. However, you did not explicitly state that private attributes are not accessible from outside the class, not even from derived classes, which is an important detail. Including this would demonstrate a fuller understanding of the privacy level enforced by double underscores.
+
+
+======================================================================
+
+Question 8: Testing-12
+----------------------------------------------------------------------
+Calculated Score: 2.10/3.0
+Original Grade: 1.50/3.0
+Difference: +0.60
+Breakdown: Core: 1/1 (100% → 70%) + Important: 0/1 (0% → 0%) = 70% of 3.0 = 2.1 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] A regression in software testing is a feature that was previously working but is now compromised.
+       You clearly understand that a regression involves a feature that was previously working but is now compromised, which captures the core concept well.
+
+Important Details:
+  [✗ MISSING] A regression can occur when a new fix or change breaks an existing feature.
+       You correctly identify that a regression involves a previously working feature becoming compromised, which shows some understanding. However, you did not mention that this typically happens due to a new fix or change breaking the existing feature. Including this cause would demonstrate a fuller grasp of the concept.
+
+
+======================================================================
+
+Question 9: Versioning-27
+----------------------------------------------------------------------
+Status: no_response
+
+======================================================================

@@ -1,0 +1,201 @@
+STUDENT ASSESSMENT SUMMARY
+======================================================================
+
+Student: d1c4f124b239688dbd7d5592667552347eae8f4ec7bd2c99966e42fb6d62d212fa7874ac77276e49164671d84bb95a69067ad73cd1686d771394702b00aebf51
+Calculated Score: 20.40/27.0
+Calculated Percentage: 75.6%
+Original Moodle Grade: 17.50/27.00
+Scoring System: 70% Core + 30% Important_Details
+
+======================================================================
+
+Question 1: Definition-33
+----------------------------------------------------------------------
+Calculated Score: 2.55/3.0
+Original Grade: 2.00/3.0
+Difference: +0.55
+Breakdown: Core: 2/2 (100% → 70%) + Important: 1/2 (50% → 15%) = 85% of 3.0 = 2.55 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] Compiled languages are translated into machine code via a compiler before execution.
+       You clearly explain that compiled languages are translated into machine code before execution by a compiler, demonstrating a solid understanding of the core concept.
+
+  [✓ OK] Interpreted languages are executed by an interpreter, translating code on the fly.
+       You clearly explain that interpreted languages are executed by interpreting code line by line at runtime, which shows you understand the core concept of interpretation as translation on the fly.
+
+Important Details:
+  [✓ OK] Compiled languages may have faster execution as the machine code is optimized for the target CPU.
+       You clearly explained that compiled languages are translated into machine code before execution and that this leads to faster execution, which shows you understand the key difference and the performance advantage of compiled languages. Well done.
+
+  [✗ MISSING] Interpreted languages allow for a faster write-test-debug cycle.
+       You correctly explained the fundamental difference between compiled and interpreted languages and mentioned execution speed and debugging flexibility. However, you did not explicitly mention that interpreted languages allow for a faster write-test-debug cycle, which is an important detail. Including this would strengthen your answer.
+
+
+======================================================================
+
+Question 2: Modelling-2
+----------------------------------------------------------------------
+Calculated Score: 2.10/3.0
+Original Grade: 2.00/3.0
+Difference: +0.10
+Breakdown: Core: 2/2 (100% → 70%) + Important: 0/2 (0% → 0%) = 70% of 3.0 = 2.1 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] Software can be modelled using the Unified Modelling Language (UML).
+       You clearly demonstrate understanding that software can be modelled using UML, mentioning different types of UML diagrams and their purposes. This shows you grasp the fundamental concept well.
+
+  [✓ OK] Software modelling involves creating a simplified representation of the software system, focusing on classes/functions, their relationships, behaviours, and interactions.
+       You clearly explain that software can be modelled using UML diagrams, including class diagrams that show classes, their attributes, and relationships, which demonstrates your understanding of representing software structure and relationships. This aligns well with the core idea of modelling software by focusing on classes and their relationships.
+
+Important Details:
+  [✗ MISSING] Software models help in understanding, explaining, and predicting the behaviour of software systems.
+       You correctly describe how software can be modelled using UML diagrams and explain some types of diagrams, which shows understanding of modelling techniques. However, you do not mention that software models help in understanding, explaining, and predicting the behaviour of software systems, which is an important detail for a complete answer.
+
+  [✗ MISSING] Software modelling is essential for managing complexity in large projects by providing more abstract and visual ways to represent software systems.
+       You correctly mention UML diagrams as a way to model software, which shows understanding of modelling techniques. However, you do not address the important detail that software modelling helps manage complexity in large projects by providing abstract and visual representations. Including this would strengthen your answer.
+
+
+======================================================================
+
+Question 3: DistributedSystems-30
+----------------------------------------------------------------------
+Calculated Score: 3.00/3.0
+Original Grade: 2.50/3.0
+Difference: +0.50
+Breakdown: Core: 2/2 (100% → 70%) + Important: 2/2 (100% → 30%) = 100% of 3.0 = 3.0 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] A broker can exploit a queue by storing messages in a FIFO manner to ensure they are consumed in the order they were produced.
+       You clearly explain that the broker stores messages in a queue and that consumers retrieve them independently, demonstrating an understanding of the FIFO nature and ordered message consumption. Well done capturing the core concept of how a broker exploits a queue.
+
+  [✓ OK] The broker mediates communication between producers and consumers by receiving messages from producers and forwarding them to consumers.
+       You clearly understand that the broker mediates communication by receiving messages from producers and forwarding them to consumers via a queue. Your explanation of the broker acting as an intermediary and decoupling producers and consumers demonstrates a solid grasp of the core concept.
+
+Important Details:
+  [✓ OK] Messages are not lost if consumers are unavailable, as they are stored in the queue until they can be consumed.
+       You clearly explain how the broker uses the queue to decouple producers and consumers and ensure reliable message delivery. Importantly, you mention that messages are stored in the queue until the consumer is ready, which shows you understand that messages are not lost if consumers are unavailable.
+
+  [✓ OK] The broker can decouple producers from consumers, allowing for more flexible and scalable system architecture.
+       You clearly explained how the broker acts as an intermediary that decouples producers from consumers by using a queue, enabling asynchronous communication and flexible system architecture. This shows a solid understanding of the key concept.
+
+
+======================================================================
+
+Question 4: GHA-1
+----------------------------------------------------------------------
+Calculated Score: 2.10/3.0
+Original Grade: 1.00/3.0
+Difference: +1.10
+Breakdown: Core: 1/1 (100% → 70%) + Important: 0/2 (0% → 0%) = 70% of 3.0 = 2.1 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] GitHub Actions is a CI/CD platform that allows developers to automate their software workflows directly in their GitHub repositories.
+       You clearly understand that GitHub Actions is a CI/CD platform enabling automation of software workflows directly within GitHub repositories. Your answer captures the core concept well.
+
+Important Details:
+  [✗ MISSING] Workflows are configured using YAML files located in the .github/workflows/ folder of the repository.
+       You explained well what GitHub Actions is and its purpose, but you did not mention that workflows are configured using YAML files located in the .github/workflows/ folder of the repository. Including this detail would show a deeper understanding of how GitHub Actions is set up and used.
+
+  [✗ MISSING] Workflows consist of jobs, which are made up of steps, and can be triggered by events such as pushes, pull requests, or manual triggers.
+       You explained well that GitHub Actions is a CI/CD platform for automating workflows in a repository, which shows understanding of the core concept. However, you did not mention that workflows consist of jobs made up of steps, nor that they can be triggered by events like pushes, pull requests, or manual triggers. Including this detail would demonstrate a fuller grasp of how GitHub Actions operates.
+
+
+======================================================================
+
+Question 5: Git-24
+----------------------------------------------------------------------
+Calculated Score: 2.10/3.0
+Original Grade: 3.00/3.0
+Difference: -0.90
+Breakdown: Core: 2/2 (100% → 70%) + Important: 0/2 (0% → 0%) = 70% of 3.0 = 2.1 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] Use the command `git clone <repository-url>` to clone the repository.
+       You correctly explained the use of the 'git clone <repository-url>' command to clone a GitHub repository, demonstrating a clear understanding of the fundamental concept. Your explanation of what cloning does adds helpful context.
+
+  [✓ OK] The command copies the repository from GitHub to your local machine.
+       You clearly explain that the 'git clone url' command copies the repository from GitHub to your local machine, including all data and versions. This shows a solid understanding of the core concept.
+
+Important Details:
+  [✗ MISSING] Ensure you have the necessary permissions to access the repository.
+       You explained the git clone command and its effect well, showing understanding of the core concept. However, you did not mention the important detail about ensuring you have the necessary permissions to access the repository, which is crucial before cloning.
+
+  [✗ MISSING] The repository URL can be found on the GitHub page of the repository you want to clone.
+       You correctly explained the use of 'git clone url' and what cloning does, showing good understanding of the core concept. However, you did not mention that the repository URL can be found on the GitHub page of the repository, which is an important detail for locating the correct URL to use.
+
+
+======================================================================
+
+Question 6: Lincense-3
+----------------------------------------------------------------------
+Calculated Score: 0.45/3.0
+Original Grade: 1.50/3.0
+Difference: -1.05
+Breakdown: Core: 0/2 (0% → 0%) + Important: 1/2 (50% → 15%) = 15% of 3.0 = 0.45 [70% Core + 30% Important]
+
+CORE Elements:
+  [✗ MISSING] Copyleft is a practice where the creator surrenders some rights under copyright law.
+       You correctly describe the key aspect of copyleft licenses requiring derivative works to use the same license, but you do not mention that copyleft involves the creator surrendering some rights under copyright law. Including this would show a fuller understanding of the fundamental concept.
+
+  [✗ MISSING] It is not a legal right but a practice.
+       You correctly describe the key aspect of copyleft licenses requiring derivative works to use the same license, but you do not mention that copyleft is a practice rather than a legal right. Including this distinction would show a fuller understanding of the concept.
+
+Important Details:
+  [✓ OK] Strong copyleft means all derived works inherit the copyleft license.
+       You clearly explained that copyleft requires modified versions to be released under the same license, which shows you understand the key idea of strong copyleft and how derived works inherit the license.
+
+  [✗ MISSING] Weak copyleft means some derived works may not inherit the copyleft license.
+       You correctly explained the fundamental concept of copyleft, emphasizing the requirement to release modified versions under the same license. However, you did not mention the important detail about weak copyleft, specifically that some derived works may not inherit the copyleft license. Including this distinction would show a deeper understanding of copyleft variations.
+
+
+======================================================================
+
+Question 7: Python-15
+----------------------------------------------------------------------
+Calculated Score: 2.10/3.0
+Original Grade: 2.00/3.0
+Difference: +0.10
+Breakdown: Core: 1/1 (100% → 70%) + Important: 0/1 (0% → 0%) = 70% of 3.0 = 2.1 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] Class attributes are marked as private by prefixing their names with double underscores (__).
+       You correctly explained that class attributes are marked as private by prefixing their names with double underscores (__), which shows a clear understanding of the core concept.
+
+Important Details:
+  [✗ MISSING] Private attributes are not accessible from outside the class, not even from derived classes.
+       You correctly explained that adding two underscores before an attribute name marks it as private in Python, which shows understanding of the core concept. However, you did not mention that private attributes are not accessible from outside the class, including derived classes, which is an important detail for full understanding.
+
+
+======================================================================
+
+Question 8: Testing-12
+----------------------------------------------------------------------
+Calculated Score: 3.00/3.0
+Original Grade: 1.00/3.0
+Difference: +2.00
+Breakdown: Core: 1/1 (100% → 70%) + Important: 1/1 (100% → 30%) = 100% of 3.0 = 3.0 [70% Core + 30% Important]
+
+CORE Elements:
+  [✓ OK] A regression in software testing is a feature that was previously working but is now compromised.
+       You clearly understand that regression involves ensuring previously working features remain intact after changes. Your explanation that regression testing reruns tests to confirm no existing functionality is broken shows a good grasp of the core concept.
+
+Important Details:
+  [✓ OK] A regression can occur when a new fix or change breaks an existing feature.
+       You clearly explain that regression testing involves re-running tests after code changes to ensure existing functionalities are not broken, which shows you understand that regressions occur when new changes break existing features.
+
+
+======================================================================
+
+Question 9: Versioning-27
+----------------------------------------------------------------------
+Calculated Score: 3.00/3.0
+Original Grade: 2.50/3.0
+Difference: +0.50
+Breakdown: Core: 1/1 (100% → 100%) = 100% of 3.0 = 3.0 [100% Core (no Important details)]
+
+CORE Elements:
+  [✓ OK] feat
+       You correctly identified 'feat' as the commit type for adding a new public method, showing a clear understanding of its purpose in conventional commits. Well done!
+
+
+======================================================================
