@@ -33,14 +33,13 @@ def get_llm(model_name: str = None) -> LLM:
     }
 
     if model_name is None:
-        #model_name = "gpt-4o"
-        model_name ="gpt-4.1-mini"
+        model_name = "gpt-4o"
 
 
     llm = LLM(
     #model=f"groq/{model_name}",
     model = model_name,
-    temperature=0.1,
+    temperature=0.0,
     )
 
     return llm
